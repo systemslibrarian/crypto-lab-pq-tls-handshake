@@ -83,11 +83,11 @@ function createWireBytesBlock(result: HandshakeResult): string {
 
   return `
     <div class="inspector-toggle">
-      <button data-inspector="group" class="chip ${groupClass}">Highlight 0x11EC</button>
-      <button data-inspector="x25519" class="chip ${xClass}">Highlight X25519 split</button>
-      <button data-inspector="mlkem" class="chip ${mClass}">Highlight ML-KEM split</button>
+      <button data-inspector="group" class="chip ${groupClass}" aria-label="Highlight named group bytes 0x11EC">Highlight 0x11EC</button>
+      <button data-inspector="x25519" class="chip ${xClass}" aria-label="Highlight X25519 public key bytes">Highlight X25519 split</button>
+      <button data-inspector="mlkem" class="chip ${mClass}" aria-label="Highlight ML-KEM public key bytes">Highlight ML-KEM split</button>
     </div>
-    <pre class="wire-block">
+    <pre class="wire-block" aria-label="ClientHello wire bytes">
 16 03 01 05 03 01 00 04 ff 03 03 ...
 00 2b 00 03 02 03 04
 00 0a 00 06 00 04 11 ec 00 1d
@@ -136,16 +136,16 @@ function render(): void {
   const latencyIncrease = (((r.latencyMs - state.classical.latencyMs) / state.classical.latencyMs) * 100).toFixed(2);
 
   appRoot.innerHTML = `
-    <main class="shell">
+    <main class="shell" aria-label="Post-quantum TLS handshake simulation">
       <header class="hero">
         <p class="kicker">Post-Quantum TLS 1.3 Handshake Lab</p>
         <h1>X25519MLKEM768 on the Wire</h1>
         <p class="subtitle">A browser simulation of the real hybrid handshake now used by Chrome, Cloudflare, and Google Search.</p>
         <div class="controls">
-          <button id="stepBtn" class="btn">Step</button>
-          <button id="autoBtn" class="btn">${state.autoPlay ? 'Stop Auto-play' : 'Auto-play'}</button>
-          <button id="resetBtn" class="btn">Reset</button>
-          <label class="toggle"><input id="wireToggle" type="checkbox" ${state.showWireBytes ? 'checked' : ''}/> Show wire bytes</label>
+          <button id="stepBtn" class="btn" aria-label="Advance to the next handshake step">Step</button>
+          <button id="autoBtn" class="btn" aria-label="Toggle automatic step playback" aria-pressed="${state.autoPlay ? 'true' : 'false'}">${state.autoPlay ? 'Stop Auto-play' : 'Auto-play'}</button>
+          <button id="resetBtn" class="btn" aria-label="Restart the handshake simulation">Reset</button>
+          <label class="toggle"><input id="wireToggle" type="checkbox" aria-label="Show wire-format bytes" ${state.showWireBytes ? 'checked' : ''}/> Show wire bytes</label>
         </div>
       </header>
 
@@ -168,7 +168,7 @@ function render(): void {
         </article>
       </section>
 
-      <section class="exhibit narrative">
+      <section class="exhibit narrative" aria-live="polite" aria-atomic="true">
         <h3>Exhibit 1: Full Handshake, Live</h3>
         ${stepNarrative(r)}
       </section>
@@ -177,7 +177,8 @@ function render(): void {
         <h3>Exhibit 2: Why Hybrid?</h3>
         <p>Final shared secret = X25519_secret || ML-KEM_secret. The connection survives if either primitive remains secure.</p>
         <table>
-          <thead><tr><th>Threat</th><th>Connection</th></tr></thead>
+          <caption>Hybrid security outcomes by threat scenario</caption>
+          <thead><tr><th scope="col">Threat</th><th scope="col">Connection</th></tr></thead>
           <tbody>
             <tr><td>Classical adversary, today</td><td class="ok">Secure</td></tr>
             <tr><td>Harvest-now-decrypt-later quantum threat</td><td class="ok">Secure</td></tr>
