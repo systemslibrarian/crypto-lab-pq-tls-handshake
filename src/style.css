@@ -15,6 +15,57 @@
   --warn: #ffaa00;
   --danger: #ff5a5a;
   --line: #223047;
+  --code-bg: #0a111c;
+}
+
+/* Light theme — the shared header's toggle sets data-theme="light" on <html>.
+   Accent colours are darkened so every text use clears WCAG AA (>=4.5:1) on
+   light surfaces, and the dark-hardcoded surfaces below are re-skinned. */
+:root[data-theme='light'] {
+  --bg0: #eef2f8;
+  --bg1: #dbe4f1;
+  --panel: #ffffff;
+  --ink: #15202e;
+  --muted: #4b5a6e;
+  --client: #0072a8;
+  --server: #b0006a;
+  --wire: #7a5d00;
+  --hybrid: #0b7a4d;
+  --x25519: #2456a0;
+  --mlkem: #7330a8;
+  --warn: #985700;
+  --danger: #bf2620;
+  --line: #c5d0de;
+  --code-bg: #f4f7fb;
+}
+
+:root[data-theme='light'] .hero {
+  background: linear-gradient(145deg, #ffffff, #e9f0f8);
+  box-shadow: 0 14px 35px rgba(40, 60, 90, 0.12);
+}
+
+:root[data-theme='light'] .exhibit {
+  background: rgba(255, 255, 255, 0.92);
+}
+
+:root[data-theme='light'] .panel {
+  background: #f6f9fd;
+}
+
+:root[data-theme='light'] .btn,
+:root[data-theme='light'] .chip {
+  background: #eef3fa;
+}
+
+/* The hex dump keeps a tinted code surface; its accent spans were tuned for a
+   dark background, so restore readable (darkened) hues on the light surface. */
+:root[data-theme='light'] .wire-block .mlkem,
+:root[data-theme='light'] .mlkem.active {
+  color: var(--mlkem);
+}
+
+:root[data-theme='light'] .x25519.active {
+  color: var(--x25519);
 }
 
 * {
@@ -263,11 +314,23 @@ caption {
   overflow: auto;
   border: 1px solid var(--line);
   border-radius: 10px;
-  background: #0a111c;
+  background: var(--code-bg);
   padding: 0.75rem;
   line-height: 1.6;
   font-family: 'IBM Plex Mono', monospace;
   font-size: 0.8rem;
+}
+
+.wire-block .group {
+  color: var(--wire);
+}
+
+.wire-block .x25519 {
+  color: var(--x25519);
+}
+
+.wire-block .mlkem {
+  color: #c79bff;
 }
 
 .group.active {
@@ -276,13 +339,27 @@ caption {
 }
 
 .x25519.active {
-  background: rgba(74, 144, 226, 0.2);
-  color: var(--x25519);
+  background: rgba(74, 144, 226, 0.25);
+  color: #8fc0ff;
 }
 
 .mlkem.active {
-  background: rgba(157, 78, 221, 0.2);
+  background: rgba(157, 78, 221, 0.25);
   color: #d7b8ff;
+}
+
+.wire-caption {
+  margin: 0.6rem 0 0;
+  color: var(--muted);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.8rem;
+}
+
+.metric-note {
+  margin: 0.7rem 0 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.45;
 }
 
 .banner {

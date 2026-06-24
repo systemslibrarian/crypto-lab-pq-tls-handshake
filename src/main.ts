@@ -13,6 +13,7 @@ import {
 } from './hybrid';
 import {
   TLS_CONSTANTS,
+  benchmarkKeyExchange,
   buildClientHello,
   buildServerHello,
   runClassicalHandshake,
@@ -24,6 +25,7 @@ interface SimulationState {
   phaseStep: number;
   result: HandshakeResult;
   classical: Awaited<ReturnType<typeof runClassicalHandshake>>;
+  compute: ReturnType<typeof benchmarkKeyExchange>;
   showWireBytes: boolean;
   autoPlay: boolean;
   autoTimer: number | null;
@@ -40,6 +42,7 @@ const state: SimulationState = {
   phaseStep: 1,
   result: await runFullHandshake(),
   classical: await runClassicalHandshake(),
+  compute: benchmarkKeyExchange(),
   showWireBytes: false,
   autoPlay: false,
   autoTimer: null,
@@ -48,10 +51,6 @@ const state: SimulationState = {
 
 function toHex(bytes: Uint8Array): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
-}
-
-function spacedHex(bytes: Uint8Array): string {
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join(' ');
 }
 
 function preview(bytes: Uint8Array, front = 8, back = 8): string {
@@ -68,34 +67,128 @@ function bytesMultiplier(bytes: number, base = 32): string {
 async function regenerateSimulation(): Promise<void> {
   state.result = await runFullHandshake();
   state.classical = await runClassicalHandshake();
+  state.compute = benchmarkKeyExchange();
   state.phaseStep = 1;
 }
 
+/** Locate a byte sub-sequence (the key share) inside the real serialized message. */
+function findSubarray(haystack: Uint8Array, needle: Uint8Array): number {
+  if (needle.length === 0 || needle.length > haystack.length) {
+    return -1;
+  }
+  for (let i = 0; i + needle.length <= haystack.length; i += 1) {
+    let match = true;
+    for (let j = 0; j < needle.length; j += 1) {
+      if (haystack[i + j] !== needle[j]) {
+        match = false;
+        break;
+      }
+    }
+    if (match) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+function offsetLabel(index: number): string {
+  return index.toString(16).padStart(4, '0');
+}
+
+/**
+ * Render the actual ClientHello bytes as an offset-annotated hex dump. The
+ * named group, X25519 public key, and ML-KEM-768 public key are colour-coded
+ * in place; the bulk of the 1184-byte ML-KEM key is elided so the framing
+ * stays legible. Every offset and length below is computed from the real
+ * serialized message, not hardcoded.
+ */
+function renderHexDump(
+  raw: Uint8Array,
+  start: number,
+  end: number,
+  classify: (i: number) => '' | 'group' | 'x25519' | 'mlkem',
+  selected: string,
+): string {
+  let out = '';
+  for (let i = start; i < end; i += 1) {
+    if (i === start || i % 16 === 0) {
+      if (i !== start) {
+        out += '\n';
+      }
+      out += `${offsetLabel(i)}  `;
+    }
+    const cls = classify(i);
+    const hex = raw[i].toString(16).padStart(2, '0');
+    if (cls) {
+      const active = cls === selected ? ' active' : '';
+      out += `<span class="${cls}${active}">${hex}</span> `;
+    } else {
+      out += `${hex} `;
+    }
+  }
+  return out;
+}
+
 function createWireBytesBlock(result: HandshakeResult): string {
-  const keyShare = result.clientHello.extensions.key_share.key_exchange;
-  const groupHex = '11 ec';
-  const xHex = spacedHex(keyShare.subarray(0, X25519_BYTES));
-  const mHex = spacedHex(keyShare.subarray(X25519_BYTES));
+  const raw = result.clientHello.rawBytes;
+  const keyEx = result.clientHello.extensions.key_share.key_exchange;
+  const keyOffset = findSubarray(raw, keyEx);
 
   const groupClass = state.selectedInspector === 'group' ? 'active' : '';
   const xClass = state.selectedInspector === 'x25519' ? 'active' : '';
   const mClass = state.selectedInspector === 'mlkem' ? 'active' : '';
 
-  return `
+  const chips = `
     <div class="inspector-toggle">
-      <button data-inspector="group" class="chip ${groupClass}" aria-label="Highlight named group bytes 0x11EC">Highlight 0x11EC</button>
-      <button data-inspector="x25519" class="chip ${xClass}" aria-label="Highlight X25519 public key bytes">Highlight X25519 split</button>
-      <button data-inspector="mlkem" class="chip ${mClass}" aria-label="Highlight ML-KEM public key bytes">Highlight ML-KEM split</button>
-    </div>
-    <pre class="wire-block" aria-label="ClientHello wire bytes">
-16 03 01 05 03 01 00 04 ff 03 03 ...
-00 2b 00 03 02 03 04
-00 0a 00 06 00 04 11 ec 00 1d
-00 33 04 c6
-  <span class="group ${groupClass}">${groupHex}</span> 04 c0
-  <span class="x25519 ${xClass}">${xHex}</span>
-  <span class="mlkem ${mClass}">${mHex}</span>
-    </pre>
+      <button data-inspector="group" class="chip ${groupClass}" aria-pressed="${groupClass ? 'true' : 'false'}" aria-label="Highlight named group bytes 0x11EC">0x11EC group</button>
+      <button data-inspector="x25519" class="chip ${xClass}" aria-pressed="${xClass ? 'true' : 'false'}" aria-label="Highlight X25519 public key bytes">X25519 split</button>
+      <button data-inspector="mlkem" class="chip ${mClass}" aria-pressed="${mClass ? 'true' : 'false'}" aria-label="Highlight ML-KEM public key bytes">ML-KEM split</button>
+    </div>`;
+
+  if (keyOffset < 0) {
+    return `${chips}<p>Unable to locate the key share in the serialized message.</p>`;
+  }
+
+  const groupOffset = keyOffset - 4; // 2-byte group + 2-byte length precede the key
+  const x25519Start = keyOffset;
+  const x25519End = keyOffset + X25519_BYTES;
+  const mlkemStart = x25519End;
+  const mlkemEnd = keyOffset + keyEx.length;
+
+  const classify = (i: number): '' | 'group' | 'x25519' | 'mlkem' => {
+    if (i >= groupOffset && i < groupOffset + 2) {
+      return 'group';
+    }
+    if (i >= x25519Start && i < x25519End) {
+      return 'x25519';
+    }
+    if (i >= mlkemStart && i < mlkemEnd) {
+      return 'mlkem';
+    }
+    return '';
+  };
+
+  // Show framing + group + full X25519 + first 32 bytes of ML-KEM, then elide
+  // the long random middle, then show the final 16 bytes of the message.
+  const headEnd = Math.min(mlkemStart + 32, raw.length);
+  const tailStart = Math.max(mlkemEnd - 16, headEnd);
+  const elided = tailStart - headEnd;
+
+  const head = renderHexDump(raw, 0, headEnd, classify, state.selectedInspector);
+  const tail =
+    tailStart < raw.length ? renderHexDump(raw, tailStart, raw.length, classify, state.selectedInspector) : '';
+  const elision = elided > 0 ? `\n        ⋯ ${elided} bytes of ML-KEM-768 public key elided ⋯\n` : '\n';
+
+  const captions: Record<string, string> = {
+    group: `Named group X25519MLKEM768 (0x11EC) at byte 0x${offsetLabel(groupOffset)} — 2 bytes`,
+    x25519: `X25519 public key at byte 0x${offsetLabel(x25519Start)} — ${X25519_BYTES} bytes`,
+    mlkem: `ML-KEM-768 public key at byte 0x${offsetLabel(mlkemStart)} — ${mlkemEnd - mlkemStart} bytes`,
+  };
+
+  return `
+    ${chips}
+    <p class="wire-caption">${captions[state.selectedInspector]} · ClientHello total ${raw.length} bytes</p>
+    <pre class="wire-block" aria-label="Real ClientHello wire bytes, hex dump with byte offsets">${head}${elision}${tail}</pre>
   `;
 }
 
@@ -133,7 +226,19 @@ function stepNarrative(result: HandshakeResult): string {
 
 function render(): void {
   const r = state.result;
-  const latencyIncrease = (((r.latencyMs - state.classical.latencyMs) / state.classical.latencyMs) * 100).toFixed(2);
+  const { classicalMs, hybridMs } = state.compute;
+  // Signed percentage with a correct +/- prefix. Compute can occasionally
+  // measure as a near-zero or slightly negative delta on a noisy sample, so the
+  // sign must come from the value, not a hardcoded '+'.
+  const signedPct = (numerator: number, denominator: number): string => {
+    if (denominator <= 0) {
+      return '0%';
+    }
+    const pct = (numerator / denominator) * 100;
+    return `${pct >= 0 ? '+' : '−'}${Math.abs(pct).toFixed(0)}%`;
+  };
+  const computeOverhead = signedPct(hybridMs - classicalMs, classicalMs);
+  const bytesOverhead = signedPct(r.totalBytes - state.classical.totalBytes, state.classical.totalBytes);
 
   appRoot.innerHTML = `
     <main class="shell" aria-label="Post-quantum TLS handshake simulation">
@@ -190,17 +295,19 @@ function render(): void {
       </section>
 
       <section class="exhibit">
-        <h3>Exhibit 3: Size and Latency Impact</h3>
+        <h3>Exhibit 3: Size and Compute Impact</h3>
         <div class="metrics">
           <div class="metric"><span>Client key share</span><strong>${CLIENT_KEYSHARE_BYTES} bytes</strong><em>${bytesMultiplier(CLIENT_KEYSHARE_BYTES)}</em></div>
           <div class="metric"><span>Server key share</span><strong>${SERVER_KEYSHARE_BYTES} bytes</strong><em>${bytesMultiplier(SERVER_KEYSHARE_BYTES)}</em></div>
-          <div class="metric"><span>Total hello bytes</span><strong>${r.totalBytes}</strong><em>vs ${state.classical.totalBytes} classical</em></div>
-          <div class="metric"><span>Latency increase</span><strong>${latencyIncrease}%</strong><em>${r.latencyMs.toFixed(2)}ms vs ${state.classical.latencyMs.toFixed(2)}ms</em></div>
+          <div class="metric"><span>Total hello bytes</span><strong>${bytesOverhead}</strong><em>${r.totalBytes} vs ${state.classical.totalBytes} classical</em></div>
+          <div class="metric"><span>Key-exchange compute</span><strong>${computeOverhead}</strong><em>${hybridMs.toFixed(3)}ms vs ${classicalMs.toFixed(3)}ms, measured</em></div>
         </div>
+        <p class="metric-note">Compute is timed live in your browser (min of ${state.compute.samples} samples). The dominant real-world post-quantum cost is the extra ${r.totalBytes - state.classical.totalBytes} bytes on the wire, not these sub-millisecond computations.</p>
       </section>
 
       <section class="exhibit">
         <h3>Exhibit 4: Wire Format Inspector</h3>
+        <p>The hex dump below is the real serialized ClientHello from this run — offsets and lengths are computed from the actual bytes.</p>
         ${state.showWireBytes ? createWireBytesBlock(r) : '<p>Enable "Show wire bytes" to inspect the 0x11EC key share framing.</p>'}
       </section>
 
@@ -243,9 +350,10 @@ function render(): void {
     }
     if (state.autoPlay) {
       state.autoTimer = window.setInterval(() => {
-        state.phaseStep += 1;
-        if (state.phaseStep > 3) {
-          state.phaseStep = 3;
+        state.phaseStep = Math.min(3, state.phaseStep + 1);
+        // Stop the moment we reach the final step — no dead extra tick that
+        // would leave the button reading "Stop Auto-play" after playback ends.
+        if (state.phaseStep >= 3) {
           state.autoPlay = false;
           if (state.autoTimer !== null) {
             window.clearInterval(state.autoTimer);

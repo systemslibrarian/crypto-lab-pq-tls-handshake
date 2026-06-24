@@ -22,9 +22,12 @@ import {
   verifyAgreement,
 } from '../src/hybrid';
 import {
+  benchmarkKeyExchange,
   runClassicalHandshake,
   runFullHandshake,
 } from '../src/handshake';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 
 function assert(condition: boolean, message: string): void {
   if (!condition) {
@@ -46,6 +49,40 @@ function fromHex(hex: string): Uint8Array {
     out[i] = Number.parseInt(clean.slice(i * 2, i * 2 + 2), 16);
   }
   return out;
+}
+
+function containsSubarray(haystack: Uint8Array, needle: Uint8Array): boolean {
+  if (needle.length === 0 || needle.length > haystack.length) {
+    return false;
+  }
+  for (let i = 0; i + needle.length <= haystack.length; i += 1) {
+    let match = true;
+    for (let j = 0; j < needle.length; j += 1) {
+      if (haystack[i + j] !== needle[j]) {
+        match = false;
+        break;
+      }
+    }
+    if (match) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Scan the production source for a forbidden pattern and return offending files. */
+function scanSource(pattern: RegExp): string[] {
+  const dir = join(process.cwd(), 'src');
+  const hits: string[] = [];
+  for (const entry of readdirSync(dir)) {
+    if (!entry.endsWith('.ts')) {
+      continue;
+    }
+    if (pattern.test(readFileSync(join(dir, entry), 'utf8'))) {
+      hits.push(entry);
+    }
+  }
+  return hits;
 }
 
 async function runPhase1(): Promise<void> {
@@ -128,8 +165,17 @@ async function runPhase3(): Promise<void> {
   assert(clientKeyRatio >= 35, 'Client key share ratio should be at least 35x');
   assert(serverKeyRatio >= 35, 'Server key share ratio should be at least 35x');
 
-  const increase = (full.latencyMs - classical.latencyMs) / classical.latencyMs;
-  assert(increase >= 0.04 && increase <= 0.06, `Latency increase out of range: ${(increase * 100).toFixed(2)}%`);
+  // Classical comparison is really serialized, not hardcoded: it must be a
+  // small X25519-only message and strictly smaller than the hybrid one.
+  assert(classical.clientHelloBytes > 0 && classical.clientHelloBytes < 200, `Classical ClientHello size unexpected: ${classical.clientHelloBytes}`);
+  assert(classical.totalBytes < full.totalBytes, 'Classical handshake should be smaller than hybrid');
+
+  // Compute cost is measured, not modelled. ML-KEM strictly adds work, so the
+  // hybrid key exchange must time at least as long as the classical one.
+  const bench = benchmarkKeyExchange(8);
+  assert(Number.isFinite(bench.classicalMs) && bench.classicalMs > 0, 'Classical compute time should be a positive measurement');
+  assert(Number.isFinite(bench.hybridMs) && bench.hybridMs > 0, 'Hybrid compute time should be a positive measurement');
+  assert(bench.hybridMs >= bench.classicalMs, `Hybrid compute should not be faster than classical: ${bench.hybridMs} < ${bench.classicalMs}`);
 
   console.log('phase-3 gates: PASS');
 }
@@ -140,7 +186,11 @@ async function runPhase7Checks(): Promise<void> {
 
   const checks: Array<{ name: string; pass: boolean; detail: string }> = [];
 
-  checks.push({ name: '1. npm run build', pass: true, detail: 'Run separately in shell for TypeScript gate' });
+  checks.push({
+    name: '1. Classical comparison is really serialized (not hardcoded)',
+    pass: classical.clientHelloBytes > 0 && classical.totalBytes < full.totalBytes,
+    detail: `classical ${classical.totalBytes}B < hybrid ${full.totalBytes}B`,
+  });
 
   const xA = x25519Keygen();
   const xB = x25519Keygen();
@@ -199,10 +249,25 @@ async function runPhase7Checks(): Promise<void> {
     detail: `client ${(CLIENT_KEYSHARE_BYTES / 32).toFixed(1)}x, server ${(SERVER_KEYSHARE_BYTES / 32).toFixed(1)}x`,
   });
 
+  const randomHits = scanSource(/Math\.random/);
   checks.push({
-    name: '10. grep -r "Math.random" src/ -> zero matches',
-    pass: true,
-    detail: 'Run separately in shell for source scan gate',
+    name: '10. No Math.random in src/ (cryptographic randomness only)',
+    pass: randomHits.length === 0,
+    detail: randomHits.length === 0 ? 'zero matches across src/*.ts' : `found in ${randomHits.join(', ')}`,
+  });
+
+  const keyEx = full.clientHello.extensions.key_share.key_exchange;
+  checks.push({
+    name: '11. Key share appears verbatim in serialized ClientHello bytes',
+    pass: containsSubarray(full.clientHello.rawBytes, keyEx),
+    detail: 'wire inspector offsets are computed from real bytes',
+  });
+
+  const bench = benchmarkKeyExchange(8);
+  checks.push({
+    name: '12. Key-exchange compute is a live measurement',
+    pass: Number.isFinite(bench.hybridMs) && bench.hybridMs > 0 && bench.hybridMs >= bench.classicalMs,
+    detail: `hybrid ${bench.hybridMs.toFixed(3)}ms >= classical ${bench.classicalMs.toFixed(3)}ms`,
   });
 
   for (const check of checks) {
@@ -210,7 +275,8 @@ async function runPhase7Checks(): Promise<void> {
     console.log(`${status} ${check.name} (${check.detail})`);
   }
 
-  console.log(`pq latency ${(full.latencyMs - classical.latencyMs).toFixed(2)}ms over classical baseline ${classical.latencyMs.toFixed(2)}ms`);
+  console.log(`measured key-exchange compute: hybrid ${bench.hybridMs.toFixed(3)}ms vs classical ${bench.classicalMs.toFixed(3)}ms (min of ${bench.samples} samples)`);
+  console.log(`wire size: hybrid ${full.totalBytes}B vs classical ${classical.totalBytes}B`);
   console.log(`transcript hash ${toHex(full.transcriptHash)}`);
 
   if (checks.some((c) => !c.pass)) {

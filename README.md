@@ -15,7 +15,12 @@ This project demonstrates both sides of a TLS 1.3 handshake entirely in-browser 
 
 The hybrid shared secret is fed into the standard TLS 1.3 key schedule (RFC 8446 Section 7.1) via `HKDF-Extract` and `HKDF-Expand-Label` exactly as TLS expects for `(EC)DHE` input.
 
-The app includes a side-by-side comparison against classical X25519-only TLS to visualize the size increase and latency impact.
+Everything shown is real, not mocked:
+
+- The **wire-format inspector** dumps the actual serialized `ClientHello`; every byte offset and length (including the `0x11EC` group position) is computed from the real message, not hardcoded.
+- The **classical X25519 comparison** is serialized through the exact same encoder, so the size difference is genuinely measured rather than asserted.
+- The **compute cost** is timed live in your browser with `performance.now()` over real keygen / encapsulation / decapsulation — reported as the minimum across samples. (The dominant real-world post-quantum cost is the extra bytes on the wire — ~1.1 KB added to the `ClientHello` alone, ~2.3 KB across both hellos — not these sub-millisecond computations, and the UI says so.)
+- All randomness comes from `crypto.getRandomValues` — a CI gate fails the build if `Math.random` ever appears in `src/`.
 
 ## When to Use It
 
@@ -59,9 +64,17 @@ npm run dev
 ## Verification
 
 ```bash
-npm run verify:phase1
-npm run verify:phase2
-npm run verify:phase3
-npm run verify:phase7
-npm run build
+npm run typecheck   # tsc strict, no emit
+npm test            # crypto + handshake gates (RFC 8448 vectors, 100x round-trip, sizes, source scan)
+npm run build       # type-check + production bundle
 ```
+
+`npm test` runs every gate in `scripts/phase-checks.ts`, including the RFC 8448
+`HKDF-Expand-Label` test vector, a 100-iteration client/server agreement loop,
+exact key-share sizes (1216 / 1120 / 64 bytes), a live compute measurement, and
+a source scan that rejects `Math.random`. The same gates run in CI
+(`.github/workflows/deploy.yml`) and **must pass before GitHub Pages deploys**.
+
+## License
+
+[MIT](LICENSE) © Paul Clark (systemslibrarian)

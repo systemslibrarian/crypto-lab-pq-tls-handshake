@@ -11,6 +11,7 @@ import {
   type X25519Keypair,
   mlkem768Keygen,
   x25519Keygen,
+  x25519SharedSecret,
 } from './primitives';
 import {
   buildClientKeyShare,
@@ -70,20 +71,12 @@ export interface HandshakeResult {
   serverHandshakeTrafficSecret: Uint8Array;
   transcriptHash: Uint8Array;
   totalBytes: number;
-  latencyMs: number;
 }
 
 function randomBytes(length: number): Uint8Array {
   const out = new Uint8Array(length);
   crypto.getRandomValues(out);
   return out;
-}
-
-function randomPercent(min: number, max: number): number {
-  const sample = new Uint16Array(1);
-  crypto.getRandomValues(sample);
-  const ratio = sample[0] / 0xffff;
-  return min + (max - min) * ratio;
 }
 
 function u16(value: number): Uint8Array {
@@ -275,7 +268,6 @@ export async function clientProcessServerHello(
   const serverHandshakeTrafficSecret = await deriveSecret(handshakeSecret, 's hs traffic', transcript);
 
   const totalBytes = clientHello.rawBytes.length + serverHello.rawBytes.length;
-  const latencyMs = Number((22 * (1 + randomPercent(0.04, 0.06))).toFixed(2));
 
   return {
     clientHello,
@@ -287,7 +279,6 @@ export async function clientProcessServerHello(
     serverHandshakeTrafficSecret,
     transcriptHash,
     totalBytes,
-    latencyMs,
   };
 }
 
@@ -302,17 +293,89 @@ export async function runFullHandshake(): Promise<HandshakeResult> {
   return result;
 }
 
+/**
+ * Build a real, byte-for-byte X25519-only TLS 1.3 handshake through the exact
+ * same serializer as the hybrid path, so the size comparison reflects genuine
+ * wire bytes rather than a guessed constant. The only differences from the
+ * hybrid ClientHello are the advertised group (0x001D) and the 32-byte key
+ * share, keeping the comparison apples-to-apples.
+ */
 export async function runClassicalHandshake(): Promise<{
   clientHelloBytes: number;
   serverHelloBytes: number;
   totalBytes: number;
-  latencyMs: number;
 }> {
-  const clientHelloBytes = 103;
-  const serverHelloBytes = 90;
-  const totalBytes = clientHelloBytes + serverHelloBytes;
-  const latencyMs = 22;
-  return { clientHelloBytes, serverHelloBytes, totalBytes, latencyMs };
+  const clientX25519 = x25519Keygen();
+  const clientHello: Omit<ClientHello, 'rawBytes'> = {
+    version: TLS12_LEGACY_VERSION,
+    random: randomBytes(32),
+    legacy_session_id: new Uint8Array(),
+    cipher_suites: [CIPHER_TLS_AES_128_GCM_SHA256],
+    extensions: {
+      supported_versions: [TLS13],
+      supported_groups: [GROUP_X25519],
+      key_share: { group: GROUP_X25519, key_exchange: clientX25519.publicKey },
+    },
+  };
+
+  const serverX25519 = x25519Keygen();
+  const serverHello: Omit<ServerHello, 'rawBytes'> = {
+    version: TLS12_LEGACY_VERSION,
+    random: randomBytes(32),
+    legacy_session_id_echo: new Uint8Array(),
+    cipher_suite: CIPHER_TLS_AES_128_GCM_SHA256,
+    extensions: {
+      supported_versions: TLS13,
+      key_share: { group: GROUP_X25519, key_exchange: serverX25519.publicKey },
+    },
+  };
+
+  const clientHelloBytes = serializeClientHello(clientHello).length;
+  const serverHelloBytes = serializeServerHello(serverHello).length;
+  return { clientHelloBytes, serverHelloBytes, totalBytes: clientHelloBytes + serverHelloBytes };
+}
+
+/**
+ * Measure the actual key-exchange compute cost in the current runtime. Each
+ * sample runs a complete key agreement (both peers); we report the minimum
+ * across samples, the standard way to filter scheduler noise from a microbench.
+ *
+ * This times CPU only. In the real world the dominant post-quantum cost is the
+ * ~1.1 KB of extra bytes on the wire, not these sub-millisecond computations —
+ * a point the UI makes explicitly so the number is not over-read.
+ */
+export function benchmarkKeyExchange(samples = 16): {
+  classicalMs: number;
+  hybridMs: number;
+  samples: number;
+} {
+  const classicalOp = (): void => {
+    const c = x25519Keygen();
+    const s = x25519Keygen();
+    x25519SharedSecret(c.secretKey, s.publicKey);
+    x25519SharedSecret(s.secretKey, c.publicKey);
+  };
+
+  const hybridOp = (): void => {
+    const x = x25519Keygen();
+    const m = mlkem768Keygen();
+    const client = buildClientKeyShare(x, m);
+    const server = serverRespondToKeyShare(client.keyShare);
+    clientComputeHybridSecret(server.serverKeyShare, x, m);
+  };
+
+  const minOf = (op: () => void): number => {
+    op(); // warm up JIT / caches before timing
+    let best = Number.POSITIVE_INFINITY;
+    for (let i = 0; i < samples; i += 1) {
+      const start = performance.now();
+      op();
+      best = Math.min(best, performance.now() - start);
+    }
+    return best;
+  };
+
+  return { classicalMs: minOf(classicalOp), hybridMs: minOf(hybridOp), samples };
 }
 
 export function assertHybridAgreement(client: Uint8Array, server: Uint8Array): void {
