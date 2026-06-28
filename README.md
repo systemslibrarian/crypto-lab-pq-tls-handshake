@@ -1,8 +1,8 @@
 # crypto-lab-pq-tls-handshake
 
-Browser-based simulation of the TLS 1.3 handshake using the X25519MLKEM768 hybrid post-quantum key exchange per draft-ietf-tls-ecdhe-mlkem-04 (February 2026, named group codepoint 0x11EC).
-
 ## What It Is
+
+Browser-based simulation of the TLS 1.3 handshake using the X25519MLKEM768 hybrid post-quantum key exchange per draft-ietf-tls-ecdhe-mlkem-04 (February 2026, named group codepoint 0x11EC).
 
 This project demonstrates both sides of a TLS 1.3 handshake entirely in-browser (no backend server) using the hybrid key exchange `X25519MLKEM768`:
 
@@ -31,12 +31,13 @@ Use this demo when you want to:
 - Inspect byte-level handshake framing and the `0x11EC` group on the wire
 - Study why TLS 1.3 key schedule logic does not need protocol changes for hybrid shared secrets
 - Compare classical and hybrid handshake size/latency behavior in a single interactive tool
-
-Not for production TLS: this is an educational simulation, not a hardened TLS stack. For production, use established libraries and runtimes.
+- Do NOT use this for production TLS — this is an educational simulation, not a hardened TLS stack. For production, use established libraries and runtimes.
 
 ## Live Demo
 
-https://systemslibrarian.github.io/crypto-lab-pq-tls-handshake/
+**[systemslibrarian.github.io/crypto-lab-pq-tls-handshake](https://systemslibrarian.github.io/crypto-lab-pq-tls-handshake/)**
+
+The demo runs both client and server sides of an X25519MLKEM768 TLS 1.3 handshake in the browser. A wire-format inspector dumps the real serialized `ClientHello` with every byte offset and length (including the `0x11EC` group position), a classical X25519 comparison serialized through the same encoder shows the measured size difference, and live `performance.now()` timing reports real keygen / encapsulation / decapsulation cost. The hybrid shared secret feeds the standard RFC 8446 key schedule unchanged, illustrating why TLS 1.3 needs no protocol changes to adopt hybrid PQC.
 
 ## What Can Go Wrong
 
@@ -48,18 +49,26 @@ https://systemslibrarian.github.io/crypto-lab-pq-tls-handshake/
 
 ## Real-World Usage
 
-`X25519MLKEM768` (`0x11EC`) is specified in `draft-ietf-tls-ecdhe-mlkem-04` and replaces early deployment identifiers such as `X25519Kyber768Draft00` (`0x6399`, deprecated).
+- `X25519MLKEM768` (`0x11EC`) is specified in `draft-ietf-tls-ecdhe-mlkem-04` and replaces early deployment identifiers such as `X25519Kyber768Draft00` (`0x6399`, deprecated).
+- As of mid-September 2025, Cloudflare reported approximately 43% of human-generated HTTPS connections using hybrid post-quantum key exchange.
+- Chrome enabled hybrid by default in M124, and support also exists in Firefox, Edge, Brave, and Opera.
+- This makes hybrid PQ TLS one of the most broadly deployed post-quantum cryptographic mechanisms in active internet use.
 
-As of mid-September 2025, Cloudflare reported approximately 43% of human-generated HTTPS connections using hybrid post-quantum key exchange. Chrome enabled hybrid by default in M124, and support also exists in Firefox, Edge, Brave, and Opera.
-
-This makes hybrid PQ TLS one of the most broadly deployed post-quantum cryptographic mechanisms in active internet use.
-
-## Local Development
+## How to Run Locally
 
 ```bash
+git clone https://github.com/systemslibrarian/crypto-lab-pq-tls-handshake
+cd crypto-lab-pq-tls-handshake
 npm install
 npm run dev
 ```
+
+## Related Demos
+- [crypto-lab-hybrid-wire](https://systemslibrarian.github.io/crypto-lab-hybrid-wire/) — X25519 + ML-KEM-768 with HKDF and AES-256-GCM, the same hybrid handshake outside TLS framing.
+- [crypto-lab-hybrid-guide](https://systemslibrarian.github.io/crypto-lab-hybrid-guide/) — KEM combiners (X-Wing) and how classical and PQ shared secrets are safely mixed.
+- [crypto-lab-kyber-vault](https://systemslibrarian.github.io/crypto-lab-kyber-vault/) — ML-KEM (FIPS 203) on its own, the PQ half of this handshake.
+- [crypto-lab-key-exchange](https://systemslibrarian.github.io/crypto-lab-key-exchange/) — Diffie-Hellman, ECDH, X25519, and ML-KEM key exchange fundamentals.
+- [crypto-lab-pq-rotation](https://systemslibrarian.github.io/crypto-lab-pq-rotation/) — the operational migration plan that rolls hybrid TLS into production.
 
 ## Verification
 
@@ -78,3 +87,9 @@ a source scan that rejects `Math.random`. The same gates run in CI
 ## License
 
 [MIT](LICENSE) © Paul Clark (systemslibrarian)
+
+---
+
+*One of 60+ browser demos in the [Crypto Lab](https://crypto-lab.systemslibrarian.dev/) suite.*
+
+*"So whether you eat or drink or whatever you do, do it all for the glory of God." — 1 Corinthians 10:31*
