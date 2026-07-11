@@ -12,9 +12,12 @@
     "verify:phase1": "tsx scripts/phase-checks.ts phase1",
     "verify:phase2": "tsx scripts/phase-checks.ts phase2",
     "verify:phase3": "tsx scripts/phase-checks.ts phase3",
-    "verify:phase7": "tsx scripts/phase-checks.ts phase7"
+    "verify:phase7": "tsx scripts/phase-checks.ts phase7",
+    "test:a11y": "playwright test"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.12.1",
+    "@playwright/test": "^1.61.1",
     "tsx": "^4.21.0",
     "typescript": "~6.0.2",
     "vite": "^8.0.4"
