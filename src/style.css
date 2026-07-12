@@ -39,11 +39,6 @@
   --code-bg: #f4f7fb;
 }
 
-:root[data-theme='light'] .hero {
-  background: linear-gradient(145deg, #ffffff, #e9f0f8);
-  box-shadow: 0 14px 35px rgba(40, 60, 90, 0.12);
-}
-
 :root[data-theme='light'] .exhibit {
   background: rgba(255, 255, 255, 0.92);
 }
@@ -110,22 +105,6 @@ body {
   animation: fade-in 500ms ease;
 }
 
-.hero {
-  background: linear-gradient(145deg, rgba(18, 33, 52, 0.85), rgba(10, 18, 30, 0.92));
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  padding: 1.5rem;
-  box-shadow: 0 14px 35px rgba(2, 8, 16, 0.45);
-}
-
-.kicker {
-  margin: 0;
-  color: var(--wire);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  font-size: 0.8rem;
-}
-
 h1,
 h2,
 h3,
@@ -133,19 +112,26 @@ h4 {
   margin: 0;
 }
 
-h1 {
-  font-size: clamp(1.8rem, 3.3vw, 3rem);
-  margin-top: 0.35rem;
-}
+/* BEGIN cl-hero standard — managed, keep in sync across fleet */
+/* Theme mapping for this demo: --text→--ink, --text-dim→--muted,
+   --accent→--client (teal-cyan brand hue, darkened in light theme so the
+   6% tint + border read correctly), --border→--line. */
+.cl-hero{display:flex;align-items:flex-start;justify-content:space-between;gap:clamp(1rem,4vw,3rem);flex-wrap:wrap;margin:clamp(1rem,3vw,2rem) 0 1.5rem;}
+.cl-hero-main{flex:1 1 22rem;min-width:min(100%,20rem);}
+.cl-hero-title{margin:0;font-size:clamp(1.6rem,3.8vw,2.7rem);font-weight:700;line-height:1.1;letter-spacing:.01em;color:var(--ink);}
+.cl-hero-sub{margin:.4rem 0 0;font-size:clamp(.9rem,1.6vw,1.05rem);letter-spacing:.01em;opacity:.85;color:var(--ink);}
+.cl-hero-desc{margin:.55rem 0 0;font-size:1rem;line-height:1.5;color:var(--muted);max-width:60ch;}
+.cl-hero-why{flex:0 1 min(40%,26rem);min-width:min(100%,15rem);border:1px solid var(--line);border-radius:10px;padding:.85rem 1.05rem;background:color-mix(in oklab,var(--client) 6%,transparent);}
+.cl-hero-why-label{display:block;font-size:.68rem;font-weight:700;letter-spacing:.14em;color:var(--muted);}
+.cl-hero-why-text{margin:.35rem 0 0;font-size:.95rem;line-height:1.5;color:var(--ink);}
+@media (max-width:640px){.cl-hero{flex-direction:column;}.cl-hero-why{flex-basis:auto;width:100%;}}
+/* END cl-hero standard */
 
-.subtitle {
-  margin-top: 0.5rem;
-  color: var(--muted);
-  max-width: 75ch;
+.hero-controls {
+  margin: 0 0 0.25rem;
 }
 
 .controls {
-  margin-top: 1rem;
   display: flex;
   gap: 0.6rem;
   flex-wrap: wrap;
@@ -479,7 +465,6 @@ caption {
     margin-top: 0.5rem;
   }
 
-  .hero,
   .exhibit {
     padding: 0.8rem;
   }

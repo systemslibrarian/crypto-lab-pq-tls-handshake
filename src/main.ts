@@ -242,17 +242,26 @@ function render(): void {
 
   appRoot.innerHTML = `
     <main class="shell" aria-label="Post-quantum TLS handshake simulation">
-      <header class="hero">
-        <p class="kicker">Post-Quantum TLS 1.3 Handshake Lab</p>
-        <h1>X25519MLKEM768 on the Wire</h1>
-        <p class="subtitle">A browser simulation of the real hybrid handshake now used by Chrome, Cloudflare, and Google Search.</p>
+      <header class="cl-hero">
+        <div class="cl-hero-main">
+          <h1 class="cl-hero-title">X25519MLKEM768</h1>
+          <p class="cl-hero-sub">Hybrid PQ key exchange · TLS 1.3 · X25519 + ML-KEM-768</p>
+          <p class="cl-hero-desc">A browser simulation of the real hybrid handshake — watch the client combine an X25519 and an ML-KEM-768 key share on the wire and feed the concatenated secret into the TLS 1.3 key schedule.</p>
+        </div>
+        <aside class="cl-hero-why" aria-label="Why it matters">
+          <span class="cl-hero-why-label">WHY IT MATTERS</span>
+          <p class="cl-hero-why-text">A harvest-now-decrypt-later attacker records today's TLS traffic to break it once a quantum computer exists. Hybrid key exchange keeps the session secret as long as either primitive holds, so the classical fallback covers any ML-KEM flaw and vice versa.</p>
+        </aside>
+      </header>
+
+      <div class="hero-controls">
         <div class="controls">
           <button id="stepBtn" class="btn" aria-label="Advance to the next handshake step">Step</button>
           <button id="autoBtn" class="btn" aria-label="Toggle automatic step playback" aria-pressed="${state.autoPlay ? 'true' : 'false'}">${state.autoPlay ? 'Stop Auto-play' : 'Auto-play'}</button>
           <button id="resetBtn" class="btn" aria-label="Restart the handshake simulation">Reset</button>
           <label class="toggle"><input id="wireToggle" type="checkbox" aria-label="Show wire-format bytes" ${state.showWireBytes ? 'checked' : ''}/> Show wire bytes</label>
         </div>
-      </header>
+      </div>
 
       <section class="exhibit two-col">
         <article class="panel client">
