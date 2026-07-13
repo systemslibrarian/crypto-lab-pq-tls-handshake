@@ -15,6 +15,17 @@ This project demonstrates both sides of a TLS 1.3 handshake entirely in-browser 
 
 The hybrid shared secret is fed into the standard TLS 1.3 key schedule (RFC 8446 Section 7.1) via `HKDF-Extract` and `HKDF-Expand-Label` exactly as TLS expects for `(EC)DHE` input.
 
+A **"Why does this exist?"** intro and a hoverable glossary front the page: a future quantum computer running Shor's algorithm breaks X25519 (and all ECDH/RSA); ML-KEM-768 is believed to resist it; hybrid runs both so an attacker must break **both**. Load-bearing jargon (key share, encapsulate/decapsulate, ephemeral, named group, HKDF-Extract, traffic secret, codepoint) is inline-defined on first use.
+
+## Exhibits
+
+1. **Full Handshake, Live** — step through the three stages (generate ephemeral keypairs → send the ClientHello, which jumps the wire inspector to the `0x11EC` named group → both sides independently derive the *same* 64-byte secret, shown side by side with a match check).
+2. **Why Hybrid?** — the threat-scenario survival table: each adversary/failure mode against a plain Secure/Broken outcome, so "safe if either primitive holds" reads straight off the rows.
+3. **Building the Hybrid Secret** — animates the 32-byte X25519 secret (blue) and 32-byte ML-KEM secret (purple) concatenating into the 64-byte hybrid value, which flows as one input into `HKDF-Extract` and out to the handshake and traffic secrets. Every hex preview is the real value derived this run — making the `|| then HKDF` "no protocol change" pipeline visible.
+4. **Size and Compute Impact** — measured key-share sizes and live compute timing, with an MTU visual drawing the 1216-byte hybrid ClientHello against a ~1500-byte packet boundary next to the tiny classical one.
+5. **Wire Format Inspector** — a hex dump of the real serialized `ClientHello`, every offset and length computed from the actual bytes, with colour-coded named-group / X25519 / ML-KEM highlights.
+6. **Deployment Reality** — current browser and CDN adoption, and the IETF codepoint story.
+
 Everything shown is real, not mocked:
 
 - The **wire-format inspector** dumps the actual serialized `ClientHello`; every byte offset and length (including the `0x11EC` group position) is computed from the real message, not hardcoded.

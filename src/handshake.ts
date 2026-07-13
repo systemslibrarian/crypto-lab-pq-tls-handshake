@@ -65,7 +65,17 @@ export interface HandshakeResult {
   clientHello: ClientHello;
   serverHello: ServerHello;
   hybridShared: Uint8Array;
+  /** First 32 bytes of hybridShared: the X25519 (classical ECDH) component. */
+  x25519Component: Uint8Array;
+  /** Last 32 bytes of hybridShared: the ML-KEM-768 (post-quantum) component. */
+  mlkemComponent: Uint8Array;
+  /** The server's independently computed 64-byte secret; must equal hybridShared. */
+  serverHybridShared: Uint8Array;
+  /** Whether client and server arrived at the same 64-byte secret (always true here). */
+  secretsAgree: boolean;
   earlySecret: Uint8Array;
+  /** "derived" secret between Early and Handshake secrets in the RFC 8446 schedule. */
+  derivedSecret: Uint8Array;
   handshakeSecret: Uint8Array;
   clientHandshakeTrafficSecret: Uint8Array;
   serverHandshakeTrafficSecret: Uint8Array;
@@ -249,11 +259,18 @@ export async function clientProcessServerHello(
   clientHello: ClientHello,
   x25519: X25519Keypair,
   mlkem: MLKEM768Keypair,
+  serverHybridShared: Uint8Array,
 ): Promise<HandshakeResult> {
-  const { hybridShared } = clientComputeHybridSecret(serverHello.extensions.key_share.key_exchange, x25519, mlkem);
+  const { hybridShared, x25519Component, mlkemComponent } = clientComputeHybridSecret(
+    serverHello.extensions.key_share.key_exchange,
+    x25519,
+    mlkem,
+  );
   if (hybridShared.length !== HYBRID_SHARED_BYTES) {
     throw new Error(`Hybrid shared secret must be ${HYBRID_SHARED_BYTES} bytes`);
   }
+
+  const secretsAgree = equalBytes(hybridShared, serverHybridShared);
 
   const transcript = concatBytes(clientHello.rawBytes, serverHello.rawBytes);
   const transcriptHash = await sha256(transcript);
@@ -261,6 +278,9 @@ export async function clientProcessServerHello(
   const zeros = new Uint8Array(32);
   const psk = new Uint8Array();
 
+  // RFC 8446 §7.1 key schedule, run verbatim: the hybrid secret is fed in as
+  // the (EC)DHE input to HKDF-Extract exactly where a classical shared secret
+  // would go — this is the "no protocol change" property, made concrete.
   const earlySecret = await hkdfExtract(zeros, psk);
   const derivedSecret = await deriveSecret(earlySecret, 'derived', new Uint8Array());
   const handshakeSecret = await hkdfExtract(derivedSecret, hybridShared);
@@ -273,7 +293,12 @@ export async function clientProcessServerHello(
     clientHello,
     serverHello,
     hybridShared,
+    x25519Component,
+    mlkemComponent,
+    serverHybridShared,
+    secretsAgree,
     earlySecret,
+    derivedSecret,
     handshakeSecret,
     clientHandshakeTrafficSecret,
     serverHandshakeTrafficSecret,
@@ -285,9 +310,9 @@ export async function clientProcessServerHello(
 export async function runFullHandshake(): Promise<HandshakeResult> {
   const { clientHello, x25519, mlkem } = await buildClientHello();
   const { serverHello, serverHybridShared } = await buildServerHello(clientHello);
-  const result = await clientProcessServerHello(serverHello, clientHello, x25519, mlkem);
+  const result = await clientProcessServerHello(serverHello, clientHello, x25519, mlkem, serverHybridShared);
 
-  if (!equalBytes(serverHybridShared, result.hybridShared)) {
+  if (!result.secretsAgree) {
     throw new Error('Client/server hybrid shared secret mismatch');
   }
   return result;

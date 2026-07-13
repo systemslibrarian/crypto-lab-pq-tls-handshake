@@ -419,6 +419,286 @@ caption {
   color: var(--muted);
 }
 
+/* --- Glossary terms: dotted underline signals "definition on hover/focus".
+   Colour is the same ink as body text so contrast is never at risk; the dotted
+   border-bottom (not colour) is the affordance, satisfying WCAG 1.4.1. --- */
+.term {
+  border-bottom: 1px dotted var(--muted);
+  cursor: help;
+  text-decoration: none;
+  font-style: normal;
+}
+
+.term:focus-visible {
+  outline: 2px solid var(--wire);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+.intro p {
+  line-height: 1.55;
+  color: var(--ink);
+}
+
+.glossary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  margin-top: 0.8rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--line);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.82rem;
+}
+
+.step-caption {
+  margin: 0.4rem 0 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+/* Legend dots in the fact lists — always paired with the term text, so colour
+   is decorative, never the sole signal. */
+.dot {
+  display: inline-block;
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  margin-right: 0.4rem;
+  vertical-align: baseline;
+}
+
+.dot-x25519 {
+  background: var(--x25519);
+}
+
+.dot-mlkem {
+  background: var(--mlkem);
+}
+
+/* --- Step 3: side-by-side matching secrets with a text+icon+colour verdict --- */
+.secret-match {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  margin: 0.8rem 0;
+}
+
+.secret-side {
+  flex: 1 1 10rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.6rem 0.7rem;
+  display: grid;
+  gap: 0.25rem;
+  background: var(--code-bg);
+}
+
+.secret-who {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.secret-side code {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.82rem;
+  word-break: break-all;
+}
+
+.secret-eq {
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 700;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+/* --- Exhibit 3: Building the Hybrid Secret pipeline --- */
+.hybrid-flow {
+  display: grid;
+  justify-items: center;
+  gap: 0.5rem;
+  margin: 1rem 0 0.5rem;
+}
+
+.hybrid-inputs {
+  display: flex;
+  align-items: stretch;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.capsule {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0.6rem 0.75rem;
+  display: grid;
+  gap: 0.25rem;
+  min-width: 12rem;
+  background: var(--code-bg);
+}
+
+.capsule-title {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.capsule-hex {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.82rem;
+  word-break: break-all;
+  color: var(--ink);
+}
+
+.capsule-len {
+  font-size: 0.74rem;
+  color: var(--muted);
+}
+
+/* Left border carries the primitive's hue as a redundant cue alongside the
+   text title, so the association is not colour-only. */
+.capsule-x25519 {
+  border-left: 4px solid var(--x25519);
+}
+
+.capsule-mlkem {
+  border-left: 4px solid var(--mlkem);
+}
+
+.capsule-hybrid {
+  border-left: 4px solid var(--hybrid);
+  min-width: min(100%, 22rem);
+}
+
+.capsule-traffic {
+  border-left: 4px solid var(--client);
+}
+
+.concat-op {
+  align-self: center;
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--muted);
+}
+
+.flow-down {
+  display: grid;
+  justify-items: center;
+  gap: 0.1rem;
+  color: var(--muted);
+}
+
+.flow-label {
+  font-size: 0.76rem;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+.flow-arrow {
+  font-size: 1.1rem;
+  line-height: 1;
+  color: var(--hybrid);
+}
+
+.hkdf-box {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0.7rem 0.85rem;
+  display: grid;
+  gap: 0.4rem;
+  width: min(100%, 30rem);
+  background: color-mix(in oklab, var(--hybrid) 6%, var(--code-bg));
+}
+
+.hkdf-title {
+  font-size: 0.82rem;
+  color: var(--ink);
+}
+
+.hkdf-stage {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.8rem;
+  align-items: baseline;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.hkdf-stage code {
+  font-family: 'IBM Plex Mono', monospace;
+  color: var(--ink);
+  word-break: break-all;
+}
+
+.traffic-out {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  width: 100%;
+}
+
+.traffic-out .capsule {
+  flex: 1 1 14rem;
+}
+
+/* --- MTU / fragmentation visual --- */
+.mtu {
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.55rem;
+  position: relative;
+}
+
+.mtu-track {
+  position: relative;
+  height: 1.9rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--code-bg);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+}
+
+.mtu-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 7px 0 0 7px;
+}
+
+.mtu-fill.classical {
+  background: color-mix(in oklab, var(--client) 45%, transparent);
+}
+
+.mtu-fill.hybrid {
+  background: color-mix(in oklab, var(--mlkem) 45%, transparent);
+}
+
+.mtu-bar-label {
+  position: relative;
+  z-index: 1;
+  padding-left: 0.6rem;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.78rem;
+  color: var(--ink);
+}
+
+.mtu-boundary {
+  border-left: 2px dashed var(--warn);
+  padding-left: 0.4rem;
+  color: var(--warn);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.76rem;
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
 @keyframes pulse {
   0% {
     transform: translateX(0);
