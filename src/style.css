@@ -112,7 +112,6 @@ h4 {
   margin: 0;
 }
 
-/* BEGIN cl-hero standard — managed, keep in sync across fleet */
 /* Theme mapping for this demo: --text→--ink, --text-dim→--muted,
    --accent→--client (teal-cyan brand hue, darkened in light theme so the
    6% tint + border read correctly), --border→--line. */
@@ -125,7 +124,12 @@ h4 {
 .cl-hero-why-label{display:block;font-size:.68rem;font-weight:700;letter-spacing:.14em;color:var(--muted);}
 .cl-hero-why-text{margin:.35rem 0 0;font-size:.95rem;line-height:1.5;color:var(--ink);}
 @media (max-width:640px){.cl-hero{flex-direction:column;}.cl-hero-why{flex-basis:auto;width:100%;}}
-/* END cl-hero standard */
+
+/* Mobile: in the column layout the 22rem flex-basis becomes a minimum
+   HEIGHT, padding dead space above the fold. Reset it. */
+@media (max-width: 640px) {
+  .cl-hero-main { flex-basis: auto; min-width: 0; }
+}
 
 .hero-controls {
   margin: 0 0 0.25rem;
@@ -148,6 +152,11 @@ h4 {
   border-radius: 999px;
   padding: 0.45rem 0.8rem;
   cursor: pointer;
+  /* WCAG 2.5.5 target size */
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .btn:hover,
