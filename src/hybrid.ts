@@ -31,7 +31,10 @@ export function buildClientKeyShare(
   assertLength(x25519.publicKey, X25519_BYTES, 'Client X25519 public key');
   assertLength(mlkem.publicKey, MLKEM768_PUBKEY_BYTES, 'Client ML-KEM public key');
 
-  const keyShare = concatBytes(x25519.publicKey, mlkem.publicKey);
+  // draft-ietf-tls-ecdhe-mlkem: for X25519MLKEM768 the ML-KEM share comes
+  // FIRST, then X25519 — the reverse of the usual hybrid naming convention,
+  // kept that way for historical reasons.
+  const keyShare = concatBytes(mlkem.publicKey, x25519.publicKey);
   assertLength(keyShare, CLIENT_KEYSHARE_BYTES, 'Client key share');
   return { keyShare, bytes: keyShare.length };
 }
@@ -41,8 +44,8 @@ export function parseServerKeyShare(keyShare: Uint8Array): {
   mlkemCiphertext: Uint8Array;
 } {
   assertLength(keyShare, SERVER_KEYSHARE_BYTES, 'Server key share');
-  const serverX25519Pub = keyShare.subarray(0, X25519_BYTES);
-  const mlkemCiphertext = keyShare.subarray(X25519_BYTES);
+  const mlkemCiphertext = keyShare.subarray(0, MLKEM768_CIPHERTEXT_BYTES);
+  const serverX25519Pub = keyShare.subarray(MLKEM768_CIPHERTEXT_BYTES);
   assertLength(serverX25519Pub, X25519_BYTES, 'Server X25519 public key');
   assertLength(mlkemCiphertext, MLKEM768_CIPHERTEXT_BYTES, 'Server ML-KEM ciphertext');
   return { serverX25519Pub, mlkemCiphertext };
@@ -58,17 +61,18 @@ export function serverRespondToKeyShare(clientKeyShare: Uint8Array): {
 } {
   assertLength(clientKeyShare, CLIENT_KEYSHARE_BYTES, 'Client key share');
 
-  const clientX25519Pub = clientKeyShare.subarray(0, X25519_BYTES);
-  const clientMlkemPub = clientKeyShare.subarray(X25519_BYTES);
+  const clientMlkemPub = clientKeyShare.subarray(0, MLKEM768_PUBKEY_BYTES);
+  const clientX25519Pub = clientKeyShare.subarray(MLKEM768_PUBKEY_BYTES);
 
   const serverX25519 = x25519Keygen();
   const x25519Shared = x25519SharedSecret(serverX25519.secretKey, clientX25519Pub);
   const { ciphertext, sharedSecret } = mlkem768Encapsulate(clientMlkemPub);
 
-  const serverHybridShared = concatBytes(x25519Shared, sharedSecret);
+  // Shared secret order matches the key-share order: ML-KEM first, then X25519.
+  const serverHybridShared = concatBytes(sharedSecret, x25519Shared);
   assertLength(serverHybridShared, HYBRID_SHARED_BYTES, 'Server hybrid shared secret');
 
-  const serverKeyShare = concatBytes(serverX25519.publicKey, ciphertext);
+  const serverKeyShare = concatBytes(ciphertext, serverX25519.publicKey);
   assertLength(serverKeyShare, SERVER_KEYSHARE_BYTES, 'Server key share');
 
   return {
@@ -93,7 +97,7 @@ export function clientComputeHybridSecret(
   const { serverX25519Pub, mlkemCiphertext } = parseServerKeyShare(serverKeyShare);
   const x25519Component = x25519SharedSecret(clientX25519.secretKey, serverX25519Pub);
   const mlkemComponent = mlkem768Decapsulate(mlkemCiphertext, clientMLKEM.secretKey);
-  const hybridShared = concatBytes(x25519Component, mlkemComponent);
+  const hybridShared = concatBytes(mlkemComponent, x25519Component);
 
   assertLength(hybridShared, HYBRID_SHARED_BYTES, 'Client hybrid shared secret');
 

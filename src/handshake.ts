@@ -65,9 +65,9 @@ export interface HandshakeResult {
   clientHello: ClientHello;
   serverHello: ServerHello;
   hybridShared: Uint8Array;
-  /** First 32 bytes of hybridShared: the X25519 (classical ECDH) component. */
+  /** Last 32 bytes of hybridShared: the X25519 (classical ECDH) component. */
   x25519Component: Uint8Array;
-  /** Last 32 bytes of hybridShared: the ML-KEM-768 (post-quantum) component. */
+  /** First 32 bytes of hybridShared: the ML-KEM-768 (post-quantum) component. */
   mlkemComponent: Uint8Array;
   /** The server's independently computed 64-byte secret; must equal hybridShared. */
   serverHybridShared: Uint8Array;

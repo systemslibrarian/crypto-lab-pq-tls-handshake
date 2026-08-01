@@ -4,7 +4,6 @@ import {
   MLKEM768_CIPHERTEXT_BYTES,
   MLKEM768_SECRET_BYTES,
   SERVER_KEYSHARE_BYTES,
-  X25519_BYTES,
   deriveSecret,
   equalBytes,
   hkdfExpandLabel,
@@ -132,8 +131,8 @@ async function runPhase2(): Promise<void> {
   assert(clientResult.hybridShared.length === HYBRID_SHARED_BYTES, 'Hybrid shared secret length mismatch');
   assert(verifyAgreement(clientResult.hybridShared, server.serverHybridShared), 'Client/server hybrid mismatch');
 
-  assert(equalBytes(clientResult.hybridShared.subarray(0, X25519_BYTES), server.x25519SharedSecret), 'Hybrid X25519 component mismatch');
-  assert(equalBytes(clientResult.hybridShared.subarray(X25519_BYTES), server.mlkemSharedSecret), 'Hybrid ML-KEM component mismatch');
+  assert(equalBytes(clientResult.hybridShared.subarray(0, MLKEM768_SECRET_BYTES), server.mlkemSharedSecret), 'Hybrid ML-KEM component mismatch');
+  assert(equalBytes(clientResult.hybridShared.subarray(MLKEM768_SECRET_BYTES), server.x25519SharedSecret), 'Hybrid X25519 component mismatch');
 
   for (let i = 0; i < 100; i += 1) {
     const x = x25519Keygen();

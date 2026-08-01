@@ -185,10 +185,11 @@ function createWireBytesBlock(result: HandshakeResult): string {
   }
 
   const groupOffset = keyOffset - 4; // 2-byte group + 2-byte length precede the key
-  const x25519Start = keyOffset;
-  const x25519End = keyOffset + X25519_BYTES;
-  const mlkemStart = x25519End;
-  const mlkemEnd = keyOffset + keyEx.length;
+  // X25519MLKEM768 puts the ML-KEM share first, then X25519.
+  const mlkemStart = keyOffset;
+  const mlkemEnd = keyOffset + keyEx.length - X25519_BYTES;
+  const x25519Start = mlkemEnd;
+  const x25519End = keyOffset + keyEx.length;
 
   const classify = (i: number): '' | 'group' | 'x25519' | 'mlkem' => {
     if (i >= groupOffset && i < groupOffset + 2) {
@@ -203,10 +204,11 @@ function createWireBytesBlock(result: HandshakeResult): string {
     return '';
   };
 
-  // Show framing + group + full X25519 + first 32 bytes of ML-KEM, then elide
-  // the long random middle, then show the final 16 bytes of the message.
+  // Show framing + group + the first 32 bytes of ML-KEM, then elide the long
+  // random middle, then show the tail of ML-KEM plus the full X25519 key that
+  // closes the key share.
   const headEnd = Math.min(mlkemStart + 32, raw.length);
-  const tailStart = Math.max(mlkemEnd - 16, headEnd);
+  const tailStart = Math.max(x25519Start - 16, headEnd);
   const elided = tailStart - headEnd;
 
   const head = renderHexDump(raw, 0, headEnd, classify, state.selectedInspector);
@@ -234,9 +236,9 @@ function stepNarrative(result: HandshakeResult): string {
       <p class="step-title">Step 1 of 3: the client generates two fresh keypairs</p>
       <p class="step-caption">One ${term('ephemeral', 'fresh per connection, then discarded — so a stolen long-term key cannot decrypt past sessions')} X25519 keypair (classical) and one ML-KEM-768 keypair (post-quantum). Their public halves are packed into a single <em>key share</em> the server will use to reach a shared secret.</p>
       <ul class="facts">
-        <li><span class="dot dot-x25519" aria-hidden="true"></span>X25519 public key: ${preview(result.clientHello.extensions.key_share.key_exchange.subarray(0, 32))} (32 bytes)</li>
-        <li><span class="dot dot-mlkem" aria-hidden="true"></span>ML-KEM-768 public key: ${preview(result.clientHello.extensions.key_share.key_exchange.subarray(32), 8, 8)} (1184 bytes)</li>
-        <li>Combined key share: 1216 bytes (${shareGrowth}x larger than X25519 alone — almost all of it the ML-KEM key)</li>
+        <li><span class="dot dot-mlkem" aria-hidden="true"></span>ML-KEM-768 public key: ${preview(result.clientHello.extensions.key_share.key_exchange.subarray(0, -32), 8, 8)} (1184 bytes)</li>
+        <li><span class="dot dot-x25519" aria-hidden="true"></span>X25519 public key: ${preview(result.clientHello.extensions.key_share.key_exchange.subarray(-32))} (32 bytes)</li>
+        <li>Combined key share: 1216 bytes (${shareGrowth}x larger than X25519 alone — almost all of it the ML-KEM key). X25519MLKEM768 places the ML-KEM share first, then X25519.</li>
       </ul>
     `;
   }
@@ -292,9 +294,9 @@ function buildHybridSecretExhibit(result: HandshakeResult): string {
 
     <div class="hybrid-flow">
       <div class="hybrid-inputs">
-        ${secretCapsule('x25519', 'X25519 secret', result.x25519Component.length, xHex)}
-        <span class="concat-op" aria-hidden="true">||</span>
         ${secretCapsule('mlkem', 'ML-KEM-768 secret', result.mlkemComponent.length, mHex)}
+        <span class="concat-op" aria-hidden="true">||</span>
+        ${secretCapsule('x25519', 'X25519 secret', result.x25519Component.length, xHex)}
       </div>
 
       <div class="flow-down" aria-hidden="true">
@@ -302,7 +304,7 @@ function buildHybridSecretExhibit(result: HandshakeResult): string {
         <span class="flow-arrow">↓</span>
       </div>
 
-      ${secretCapsule('hybrid', 'Hybrid shared secret (X25519 || ML-KEM)', result.hybridShared.length, hybridHex)}
+      ${secretCapsule('hybrid', 'Hybrid shared secret (ML-KEM || X25519)', result.hybridShared.length, hybridHex)}
 
       <div class="flow-down" aria-hidden="true">
         <span class="flow-label">fed as the (EC)DHE input</span>

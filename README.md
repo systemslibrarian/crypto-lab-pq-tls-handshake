@@ -7,11 +7,16 @@ Browser-based simulation of the TLS 1.3 handshake using the X25519MLKEM768 hybri
 This project demonstrates both sides of a TLS 1.3 handshake entirely in-browser (no backend server) using the hybrid key exchange `X25519MLKEM768`:
 
 - Client key share construction:
-  - `X25519_pub (32)` + `ML-KEM-768_pub (1184)` = `1216` bytes
+  - `ML-KEM-768_pub (1184)` + `X25519_pub (32)` = `1216` bytes
 - Server key share construction:
-  - `X25519_pub (32)` + `ML-KEM-768_ciphertext (1088)` = `1120` bytes
+  - `ML-KEM-768_ciphertext (1088)` + `X25519_pub (32)` = `1120` bytes
 - Hybrid secret:
-  - `X25519_shared (32)` + `ML-KEM_shared (32)` = `64` bytes
+  - `ML-KEM_shared (32)` + `X25519_shared (32)` = `64` bytes
+
+Note the ordering: for `X25519MLKEM768` the ML-KEM share comes **first**, which
+reverses the usual hybrid naming convention. The draft calls this out explicitly
+and keeps it for historical reasons, so a hybrid implementation that concatenates
+in name order will not interoperate.
 
 The hybrid shared secret is fed into the standard TLS 1.3 key schedule (RFC 8446 Section 7.1) via `HKDF-Extract` and `HKDF-Expand-Label` exactly as TLS expects for `(EC)DHE` input.
 
@@ -21,7 +26,7 @@ A **"Why does this exist?"** intro and a hoverable glossary front the page: a fu
 
 1. **Full Handshake, Live** — step through the three stages (generate ephemeral keypairs → send the ClientHello, which jumps the wire inspector to the `0x11EC` named group → both sides independently derive the *same* 64-byte secret, shown side by side with a match check).
 2. **Why Hybrid?** — the threat-scenario survival table: each adversary/failure mode against a plain Secure/Broken outcome, so "safe if either primitive holds" reads straight off the rows.
-3. **Building the Hybrid Secret** — animates the 32-byte X25519 secret (blue) and 32-byte ML-KEM secret (purple) concatenating into the 64-byte hybrid value, which flows as one input into `HKDF-Extract` and out to the handshake and traffic secrets. Every hex preview is the real value derived this run — making the `|| then HKDF` "no protocol change" pipeline visible.
+3. **Building the Hybrid Secret** — animates the 32-byte ML-KEM secret (purple) and 32-byte X25519 secret (blue) concatenating, in that draft-mandated order, into the 64-byte hybrid value, which flows as one input into `HKDF-Extract` and out to the handshake and traffic secrets. Every hex preview is the real value derived this run — making the `|| then HKDF` "no protocol change" pipeline visible.
 4. **Size and Compute Impact** — measured key-share sizes and live compute timing, with an MTU visual drawing the 1216-byte hybrid ClientHello against a ~1500-byte packet boundary next to the tiny classical one.
 5. **Wire Format Inspector** — a hex dump of the real serialized `ClientHello`, every offset and length computed from the actual bytes, with colour-coded named-group / X25519 / ML-KEM highlights.
 6. **Deployment Reality** — current browser and CDN adoption, and the IETF codepoint story.
