@@ -264,7 +264,7 @@ function stepNarrative(result: HandshakeResult): string {
       <div class="secret-side"><span class="secret-who">Server derives</span><code>${serverPrev}</code></div>
     </div>
     <ul class="facts">
-      <li>Hybrid shared secret: ${result.hybridShared.length} bytes (32 X25519 + 32 ML-KEM)</li>
+      <li>Hybrid shared secret: ${result.hybridShared.length} bytes (32 ML-KEM + 32 X25519, in that draft-mandated order)</li>
       <li>This 64-byte value feeds HKDF unchanged — see the pipeline below</li>
     </ul>
   `;
@@ -436,7 +436,9 @@ function render(): void {
 
       <section class="exhibit">
         <h3>Exhibit 2: Why Hybrid?</h3>
-        <p>Final shared secret = X25519_secret || ML-KEM_secret. The connection survives if either primitive remains secure.</p>
+        <p>Final shared secret = ML-KEM_secret || X25519_secret — the ML-KEM share comes first for
+        <code>X25519MLKEM768</code>, and an implementation that concatenates in name order will not
+        interoperate. The connection survives if either primitive remains secure.</p>
         <table>
           <caption>Hybrid security outcomes by threat scenario</caption>
           <thead><tr><th scope="col">Threat</th><th scope="col">Connection</th></tr></thead>
