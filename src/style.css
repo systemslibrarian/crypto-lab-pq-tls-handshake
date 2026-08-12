@@ -14,6 +14,15 @@
   --mlkem: #9d4edd;
   --warn: #ffaa00;
   --danger: #ff5a5a;
+  /* --line is a SURFACE divider: exhibit, panel, table row, capsule and
+     glossary edges, all of which WCAG 1.4.11 exempts as decoration.
+     --control-border is a CONTROL boundary, and the two are deliberately
+     different tokens. Every .btn and .chip on this page paints a near-panel
+     fill (#172235) and drew its edge in --line, so the fill delineated nothing
+     (1.13:1 against the surface behind it) and the border delineated nothing
+     either — the whole control set measured 1.12:1 to 1.21:1. --control-border
+     is 4.18:1 against that surface and 3.69:1 against the fill. */
+  --control-border: #6f7b90;
   --line: #223047;
   --code-bg: #0a111c;
 }
@@ -26,15 +35,28 @@
   --bg1: #dbe4f1;
   --panel: #ffffff;
   --ink: #15202e;
-  --muted: #4b5a6e;
+  /* Every muted string on this page sits on the body's three-layer gradient or
+     on a translucent surface over it, not on a flat --bg0. #4b5a6e measured
+     4.19:1 on the hero aside's tinted composite and 4.39:1 under the "Show wire
+     bytes" toggle — both under the 4.5:1 floor, and both invisible to axe,
+     which files a gradient backdrop as `incomplete`. Darkened to clear the
+     WORST composite the page paints, not the nominal surface. */
+  --muted: #414e60;
   --client: #0072a8;
   --server: #b0006a;
   --wire: #7a5d00;
-  --hybrid: #0b7a4d;
+  /* Also the footer link ink. Measured 4.21:1 to 4.26:1 on the footer's
+     gradient composite — the CSS comment beside `.site-footer a` asserted these
+     tokens "clear AA against the footer background", and the measurement says
+     they did not. 5.17:1 now. */
+  --hybrid: #0a6b43;
   --x25519: #2456a0;
   --mlkem: #7330a8;
   --warn: #985700;
   --danger: #bf2620;
+  /* 4.42:1 against the light exhibit surface, 5.02:1 against the light .btn
+     fill (was --line #c5d0de: 1.24:1 / 1.39:1). */
+  --control-border: #5c6878;
   --line: #c5d0de;
   --code-bg: #f4f7fb;
 }
@@ -65,6 +87,21 @@
 
 * {
   box-sizing: border-box;
+}
+
+/* Text for assistive technology only. Needed because an `aria-label` on an
+   `<abbr>` is PROHIBITED by ARIA and silently discarded — see the note on
+   `term()` in `src/main.ts`. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* Give <html> a real solid background-color per theme (not just the body's
@@ -99,10 +136,35 @@ body {
   margin: 1rem auto 3rem;
 }
 
+/* WCAG 1.4.10 (Reflow), and the two halves of it are separate bugs.
+
+   FIRST, this is a `display: grid` with no `grid-template-columns`, which is an
+   implicit single `auto` track — and an `auto` track takes the MIN-CONTENT of
+   its widest item as a floor. So one wide exhibit sized the entire page: at a
+   380px viewport the document's scrollWidth was 525px, and every element in the
+   shell measured 517px wide, because `.exhibit.footnote` (the 48-hex-character
+   transcript hash) had a min-content of 517px and the track grew to it.
+   `minmax(0, 1fr)` removes that floor.
+   
+   SECOND, once the track is capped the wide items have to actually fit, and
+   several genuinely could not: the transcript-hash paragraph at 490px, the
+   threat table at 490px, the 19-character hex previews in `.facts`, and the
+   `X25519MLKEM768` codepoint name in the hero title — all machine tokens with
+   no break opportunity in them. `overflow-wrap: anywhere` (NOT `break-word`,
+   which does not reduce min-content at all) is what lets them wrap.
+   
+   The old gate could not see any of this: it never ran at a narrow viewport,
+   and axe has no reflow rule. */
 .shell {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 1rem;
   animation: fade-in 500ms ease;
+}
+
+.cl-hero,
+.exhibit {
+  overflow-wrap: anywhere;
 }
 
 h1,
@@ -144,7 +206,7 @@ h4 {
 
 .btn,
 .chip {
-  border: 1px solid var(--line);
+  border: 1px solid var(--control-border);
   background: #172235;
   color: var(--ink);
   font-family: 'IBM Plex Mono', monospace;
@@ -220,19 +282,33 @@ h4 {
   gap: 0.8rem;
 }
 
+/* "Not yet sent" is drawn with a MUTED INK and a dashed edge, never with
+   opacity. These two pills carry real words — "ClientHello" and "ServerHello" —
+   and both ship inactive, so `opacity: 0.35` was the arrival rendering of the
+   only two labels in the wire lane: 2.61:1 dark and 2.13:1 light, against a
+   4.5:1 floor. Opacity also compounds, and it fades the text and its own
+   background onto the page together, which is why no palette change could have
+   rescued it. --muted measures 7.37:1 dark and 7.98:1 light on the same pill. */
 .arrow {
   text-align: center;
   font-family: 'IBM Plex Mono', monospace;
   font-size: 0.78rem;
-  background: rgba(255, 215, 0, 0.08);
-  border: 1px dashed rgba(255, 215, 0, 0.55);
+  /* The wire hue as a TOKEN, not as a fixed rgba(255,215,0,…). The hardcoded
+     form did not move with the light theme, so the dashed edge — which is now
+     the "not yet sent" cue, since `.active` switches it to solid — measured
+     4.46:1 against the pill in dark and 1.20:1 in light, i.e. it was one of two
+     state cues and it was invisible in half the themes. Mixed at 75% rather
+     than 55% so it clears 3:1 in BOTH: 7.12:1 dark, 3.33:1 light. */
+  background: color-mix(in oklab, var(--wire) 8%, transparent);
+  border: 1px dashed color-mix(in oklab, var(--wire) 75%, transparent);
   border-radius: 999px;
   padding: 0.4rem 0.65rem;
-  opacity: 0.35;
+  color: var(--muted);
 }
 
 .arrow.active {
-  opacity: 1;
+  color: var(--ink);
+  border-style: solid;
   animation: pulse 1000ms ease infinite;
 }
 
@@ -319,6 +395,13 @@ caption {
   flex-wrap: wrap;
 }
 
+/* A scrolling region with no focusable content inside it cannot be scrolled
+   from a keyboard at all (WCAG 2.1.1), and this one genuinely scrolls: the hex
+   dump is `white-space: pre` and lays out at ~420px, wider than the column at
+   phone width. So the markup gives it `tabindex="0"` and a `role="region"` —
+   which is also what makes its `aria-label` legal, since an `aria-label` on a
+   role-less `<pre>` is PROHIBITED and silently discarded. Being a tab stop then
+   makes the focus ring below mandatory (WCAG 2.4.7). */
 .wire-block {
   margin-top: 0.65rem;
   max-height: 280px;
@@ -330,6 +413,11 @@ caption {
   line-height: 1.6;
   font-family: 'IBM Plex Mono', monospace;
   font-size: 0.8rem;
+}
+
+.wire-block:focus-visible {
+  outline: 2px solid var(--wire);
+  outline-offset: 2px;
 }
 
 .wire-block .group {
@@ -671,11 +759,17 @@ caption {
   align-items: center;
 }
 
+/* Where the bar ENDS is the datum this figure exists to show, and the fills are
+   deliberately translucent so the byte-count label stays readable on top of
+   them — opaque `--client` under `--ink` measures 1.35:1. That leaves the fill
+   itself at 1.74:1 dark / 2.19:1 light against its track, so the end of the bar
+   is marked by a high-contrast edge instead: 14.4:1 dark, 14.9:1 light. */
 .mtu-fill {
   position: absolute;
   left: 0;
   top: 0;
   bottom: 0;
+  border-right: 2px solid var(--ink);
   border-radius: 7px 0 0 7px;
 }
 

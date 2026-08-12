@@ -71,13 +71,25 @@ function attr(text: string): string {
 
 /**
  * A hoverable + keyboard-focusable glossary term. The definition is exposed
- * both visually (on hover/focus via title + the abbr's native tooltip) and to
- * assistive tech via aria-label, so the term carries its meaning without color.
- * A dotted underline signals "there's more here" independent of colour.
+ * visually through the `<abbr>`'s native tooltip, and to assistive technology
+ * through visually-hidden text inside the element.
+ *
+ * It used to carry `aria-label` for the second half of that, and it did not
+ * work: `<abbr>` has NO implicit ARIA role, and `aria-label` on a role-less
+ * element is PROHIBITED by ARIA and silently discarded — so the docblock that
+ * used to sit here, claiming the definition was "exposed ... to assistive tech
+ * via aria-label", described something no assistive technology ever received.
+ * axe files that under `incomplete`, never `violations`, which is exactly why
+ * the violations-only gate this replaces never saw it across all seven terms.
+ *
+ * Visually-hidden text is not a workaround for the same idea; it is the
+ * mechanism that actually delivers it, because it is CONTENT rather than a
+ * naming attribute and needs no role to be read. A dotted underline signals
+ * "there's more here" independent of colour.
  */
 function term(label: string, definition: string): string {
   const full = `${label}: ${definition}`;
-  return `<abbr class="term" tabindex="0" title="${attr(full)}" aria-label="${attr(full)}">${label}</abbr>`;
+  return `<abbr class="term" tabindex="0" title="${attr(full)}">${label}<span class="sr-only"> — ${attr(definition)}</span></abbr>`;
 }
 
 /**
@@ -225,7 +237,7 @@ function createWireBytesBlock(result: HandshakeResult): string {
   return `
     ${chips}
     <p class="wire-caption">${captions[state.selectedInspector]} · ClientHello total ${raw.length} bytes</p>
-    <pre class="wire-block" aria-label="Real ClientHello wire bytes, hex dump with byte offsets">${head}${elision}${tail}</pre>
+    <pre class="wire-block" role="region" tabindex="0" aria-label="Real ClientHello wire bytes, hex dump with byte offsets">${head}${elision}${tail}</pre>
   `;
 }
 
@@ -260,7 +272,9 @@ function stepNarrative(result: HandshakeResult): string {
     <p class="step-caption">The server encapsulates to the client's ML-KEM key and runs X25519; the client decapsulates and runs X25519. Neither ever sent the secret — they each computed it. If even one primitive holds, an eavesdropper cannot.</p>
     <div class="secret-match">
       <div class="secret-side"><span class="secret-who">Client derives</span><code>${clientPrev}</code></div>
-      <div class="secret-eq ${result.secretsAgree ? 'ok' : 'bad'}" aria-label="${result.secretsAgree ? 'secrets match' : 'secrets differ'}">${result.secretsAgree ? '✓ match' : '✗ differ'}</div>
+      <!-- No aria-label: on a role-less <div> it is PROHIBITED and discarded,
+           and it only restated the word already inside the element. -->
+      <div class="secret-eq ${result.secretsAgree ? 'ok' : 'bad'}">${result.secretsAgree ? '✓ match' : '✗ differ'}</div>
       <div class="secret-side"><span class="secret-who">Server derives</span><code>${serverPrev}</code></div>
     </div>
     <ul class="facts">
@@ -401,7 +415,9 @@ function render(): void {
         <h3>Why does this exist?</h3>
         <p>Today's TLS uses <strong>X25519</strong>, a form of ${term('ECDH', 'elliptic-curve Diffie-Hellman: two sides derive a shared secret from public keys, secure because recovering the private key is computationally hard')}. A future quantum computer running <strong>${term("Shor's algorithm", "a quantum algorithm that factors integers and solves discrete logs efficiently — it breaks RSA and all elliptic-curve Diffie-Hellman, including X25519")}</strong> would break X25519 (and RSA, and every classical key exchange) outright. <strong>ML-KEM-768</strong> is a ${term('KEM', 'key encapsulation mechanism: instead of a shared computation, one side encapsulates a random secret to the other side’s public key. The PQ analog of encrypt-to-a-public-key.')} built on lattice problems that are <em>believed</em> to resist quantum attack.</p>
         <p><strong>Hybrid</strong> runs both and combines their secrets, so an attacker must break <em>both</em> to win — safe against a classical adversary today (X25519) <em>and</em> against a future quantum one (ML-KEM), with each covering any surprise weakness in the other. The threat table in Exhibit 2 reads that property straight off the rows.</p>
-        <div class="glossary" aria-label="Key terms — hover or focus for definitions">
+        <!-- role="group" is what makes this label legal: an aria-label on a
+             role-less <div> is PROHIBITED by ARIA and silently discarded. -->
+        <div class="glossary" role="group" aria-label="Key terms — hover or focus for definitions">
           ${term('key share', 'your public key, sent so the other side can derive a shared secret')}
           ${term('encapsulate', "a KEM's version of encrypt-to-a-public-key: produce a ciphertext plus a shared secret")}
           ${term('decapsulate', 'recover that shared secret from the ciphertext using your private key')}
