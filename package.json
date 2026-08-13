@@ -23,7 +23,7 @@
     "vite": "^8.0.4"
   },
   "dependencies": {
-    "@noble/curves": "^2.2.0",
+    "@noble/curves": "^2.3.0",
     "@noble/post-quantum": "^0.6.1"
   }
 }
