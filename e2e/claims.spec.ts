@@ -13,7 +13,7 @@ test('the rendered hybrid order matches the draft-mandated ML-KEM-first order', 
   page,
 }) => {
   await page.goto('.');
-  await expect(page.locator('#cl-theme-toggle')).toBeVisible();
+  await expect(page.locator('.cl-topbar')).toBeVisible();
 
   const body = page.locator('body');
   await expect(body).toContainText('ML-KEM_secret || X25519_secret');
@@ -28,7 +28,7 @@ test('the rendered hybrid order matches the draft-mandated ML-KEM-first order', 
 
 test('the displayed hybrid secret really begins with the ML-KEM component', async ({ page }) => {
   await page.goto('.');
-  await expect(page.locator('#cl-theme-toggle')).toBeVisible();
+  await expect(page.locator('.cl-topbar')).toBeVisible();
   await page.locator('#stepBtn').click();
   await page.locator('#stepBtn').click();
 
