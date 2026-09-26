@@ -18,7 +18,7 @@ reverses the usual hybrid naming convention. RFC 10024 calls this out explicitly
 and keeps it for historical reasons, so a hybrid implementation that concatenates
 in name order will not interoperate.
 
-The hybrid shared secret is fed into the standard TLS 1.3 key schedule (RFC 8446 Section 7.1) via `HKDF-Extract` and `HKDF-Expand-Label` exactly as TLS expects for `(EC)DHE` input.
+The hybrid shared secret is fed into the standard TLS 1.3 key schedule (RFC 9846 Section 7.1) via `HKDF-Extract` and `HKDF-Expand-Label` exactly as TLS expects for `(EC)DHE` input.
 
 A **"Why does this exist?"** intro and a hoverable glossary front the page: a future quantum computer running Shor's algorithm breaks X25519 (and all ECDH/RSA); ML-KEM-768 is believed to resist it; hybrid runs both so an attacker must break **both**. Load-bearing jargon (key share, encapsulate/decapsulate, ephemeral, named group, HKDF-Extract, traffic secret, codepoint) is inline-defined on first use.
 
@@ -53,7 +53,7 @@ Use this demo when you want to:
 
 **[systemslibrarian.github.io/crypto-lab-pq-tls-handshake](https://systemslibrarian.github.io/crypto-lab-pq-tls-handshake/)**
 
-The demo runs both client and server sides of an X25519MLKEM768 TLS 1.3 handshake in the browser. A wire-format inspector dumps the real serialized `ClientHello` with every byte offset and length (including the `0x11EC` group position), a classical X25519 comparison serialized through the same encoder shows the measured size difference, and live `performance.now()` timing reports real keygen / encapsulation / decapsulation cost. The hybrid shared secret feeds the standard RFC 8446 key schedule unchanged, illustrating why TLS 1.3 needs no protocol changes to adopt hybrid PQC.
+The demo runs both client and server sides of an X25519MLKEM768 TLS 1.3 handshake in the browser. A wire-format inspector dumps the real serialized `ClientHello` with every byte offset and length (including the `0x11EC` group position), a classical X25519 comparison serialized through the same encoder shows the measured size difference, and live `performance.now()` timing reports real keygen / encapsulation / decapsulation cost. The hybrid shared secret feeds the standard RFC 9846 key schedule unchanged, illustrating why TLS 1.3 needs no protocol changes to adopt hybrid PQC.
 
 ## What Can Go Wrong
 

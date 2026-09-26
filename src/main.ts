@@ -326,7 +326,7 @@ function buildHybridSecretExhibit(result: HandshakeResult): string {
       </div>
 
       <div class="hkdf-box">
-        <span class="hkdf-title">${term('HKDF-Extract', 'the standard key-derivation step that mixes the shared secret into a uniform pseudorandom key')} · TLS 1.3 key schedule (RFC 8446 §7.1)</span>
+        <span class="hkdf-title">${term('HKDF-Extract', 'the standard key-derivation step that mixes the shared secret into a uniform pseudorandom key')} · TLS 1.3 key schedule (RFC 9846 §7.1)</span>
         <div class="hkdf-stage"><span>salt = "derived" secret</span><code>${derivedHex}</code></div>
         <div class="hkdf-stage"><span>→ Handshake Secret</span><code>${hsHex}</code></div>
       </div>

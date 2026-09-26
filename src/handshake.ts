@@ -74,7 +74,7 @@ export interface HandshakeResult {
   /** Whether client and server arrived at the same 64-byte secret (always true here). */
   secretsAgree: boolean;
   earlySecret: Uint8Array;
-  /** "derived" secret between Early and Handshake secrets in the RFC 8446 schedule. */
+  /** "derived" secret between Early and Handshake secrets in the RFC 9846 schedule. */
   derivedSecret: Uint8Array;
   handshakeSecret: Uint8Array;
   clientHandshakeTrafficSecret: Uint8Array;
@@ -278,7 +278,7 @@ export async function clientProcessServerHello(
   const zeros = new Uint8Array(32);
   const psk = new Uint8Array();
 
-  // RFC 8446 §7.1 key schedule, run verbatim: the hybrid secret is fed in as
+  // RFC 9846 §7.1 key schedule, run verbatim: the hybrid secret is fed in as
   // the (EC)DHE input to HKDF-Extract exactly where a classical shared secret
   // would go — this is the "no protocol change" property, made concrete.
   const earlySecret = await hkdfExtract(zeros, psk);
