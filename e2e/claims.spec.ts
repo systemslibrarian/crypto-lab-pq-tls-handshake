@@ -9,7 +9,7 @@ import { expect, test } from '@playwright/test';
  * displayed bytes, to the order the code actually uses.
  */
 
-test('the rendered hybrid order matches the draft-mandated ML-KEM-first order', async ({
+test('the rendered hybrid order matches RFC 10024’s ML-KEM-first order', async ({
   page,
 }) => {
   await page.goto('.');
@@ -24,6 +24,8 @@ test('the rendered hybrid order matches the draft-mandated ML-KEM-first order', 
 
   await expect(body).toContainText('32 ML-KEM + 32 X25519');
   await expect(body).not.toContainText('32 X25519 + 32 ML-KEM');
+  await expect(page.getByRole('link', { name: 'RFC 10024' })).toHaveAttribute('href', 'https://www.rfc-editor.org/rfc/rfc10024.html');
+  await expect(body).toContainText('final IETF Standards Track');
 });
 
 test('the displayed hybrid secret really begins with the ML-KEM component', async ({ page }) => {

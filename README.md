@@ -2,7 +2,7 @@
 
 ## What It Is
 
-Browser-based simulation of the TLS 1.3 handshake using the X25519MLKEM768 hybrid post-quantum key exchange per draft-ietf-tls-ecdhe-mlkem-04 (February 2026, named group codepoint 0x11EC).
+Browser-based simulation of the TLS 1.3 handshake using the X25519MLKEM768 hybrid post-quantum key exchange specified in [RFC 10024](https://www.rfc-editor.org/rfc/rfc10024.html) (IETF Standards Track, August 2026; named group codepoint 0x11EC).
 
 This project demonstrates both sides of a TLS 1.3 handshake entirely in-browser (no backend server) using the hybrid key exchange `X25519MLKEM768`:
 
@@ -14,7 +14,7 @@ This project demonstrates both sides of a TLS 1.3 handshake entirely in-browser 
   - `ML-KEM_shared (32)` + `X25519_shared (32)` = `64` bytes
 
 Note the ordering: for `X25519MLKEM768` the ML-KEM share comes **first**, which
-reverses the usual hybrid naming convention. The draft calls this out explicitly
+reverses the usual hybrid naming convention. RFC 10024 calls this out explicitly
 and keeps it for historical reasons, so a hybrid implementation that concatenates
 in name order will not interoperate.
 
@@ -26,7 +26,7 @@ A **"Why does this exist?"** intro and a hoverable glossary front the page: a fu
 
 1. **Full Handshake, Live** — step through the three stages (generate ephemeral keypairs → send the ClientHello, which jumps the wire inspector to the `0x11EC` named group → both sides independently derive the *same* 64-byte secret, shown side by side with a match check).
 2. **Why Hybrid?** — the threat-scenario survival table: each adversary/failure mode against a plain Secure/Broken outcome, so "safe if either primitive holds" reads straight off the rows.
-3. **Building the Hybrid Secret** — animates the 32-byte ML-KEM secret (purple) and 32-byte X25519 secret (blue) concatenating, in that draft-mandated order, into the 64-byte hybrid value, which flows as one input into `HKDF-Extract` and out to the handshake and traffic secrets. Every hex preview is the real value derived this run — making the `|| then HKDF` "no protocol change" pipeline visible.
+3. **Building the Hybrid Secret** — animates the 32-byte ML-KEM secret (purple) and 32-byte X25519 secret (blue) concatenating, in the RFC 10024 order, into the 64-byte hybrid value, which flows as one input into `HKDF-Extract` and out to the handshake and traffic secrets. Every hex preview is the real value derived this run — making the `|| then HKDF` "no protocol change" pipeline visible.
 4. **Size and Compute Impact** — measured key-share sizes and live compute timing, with an MTU visual drawing the 1216-byte hybrid ClientHello against a ~1500-byte packet boundary next to the tiny classical one.
 5. **Wire Format Inspector** — a hex dump of the real serialized `ClientHello`, every offset and length computed from the actual bytes, with colour-coded named-group / X25519 / ML-KEM highlights.
 6. **Deployment Reality** — current browser and CDN adoption, and the IETF codepoint story.
@@ -65,7 +65,7 @@ The demo runs both client and server sides of an X25519MLKEM768 TLS 1.3 handshak
 
 ## Real-World Usage
 
-- `X25519MLKEM768` (`0x11EC`) is specified in `draft-ietf-tls-ecdhe-mlkem-04` and replaces early deployment identifiers such as `X25519Kyber768Draft00` (`0x6399`, deprecated).
+- `X25519MLKEM768` (`0x11EC`) is specified in the final Standards Track [RFC 10024](https://www.rfc-editor.org/rfc/rfc10024.html) (August 2026), superseding the earlier `draft-ietf-tls-ecdhe-mlkem` text. It replaces early deployment identifiers such as `X25519Kyber768Draft00` (`0x6399`, deprecated).
 - As of mid-September 2025, Cloudflare reported approximately 43% of human-generated HTTPS connections using hybrid post-quantum key exchange.
 - Chrome enabled hybrid by default in M124, and support also exists in Firefox, Edge, Brave, and Opera.
 - This makes hybrid PQ TLS one of the most broadly deployed post-quantum cryptographic mechanisms in active internet use.

@@ -278,7 +278,7 @@ function stepNarrative(result: HandshakeResult): string {
       <div class="secret-side"><span class="secret-who">Server derives</span><code>${serverPrev}</code></div>
     </div>
     <ul class="facts">
-      <li>Hybrid shared secret: ${result.hybridShared.length} bytes (32 ML-KEM + 32 X25519, in that draft-mandated order)</li>
+      <li>Hybrid shared secret: ${result.hybridShared.length} bytes (32 ML-KEM + 32 X25519, in RFC 10024 order)</li>
       <li>This 64-byte value feeds HKDF unchanged — see the pipeline below</li>
     </ul>
   `;
@@ -501,7 +501,7 @@ function render(): void {
           </div>
           <div>
             <h4>IETF and codepoint</h4>
-            <p>draft-ietf-tls-ecdhe-mlkem-04, named group X25519MLKEM768 (0x11EC), replacing deprecated 0x6399.</p>
+            <p><a href="https://www.rfc-editor.org/rfc/rfc10024.html" target="_blank" rel="noopener">RFC 10024</a> (final IETF Standards Track, August 2026) defines named group X25519MLKEM768 (0x11EC), replacing deprecated 0x6399.</p>
           </div>
         </div>
       </section>

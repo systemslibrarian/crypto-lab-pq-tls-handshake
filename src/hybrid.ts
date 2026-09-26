@@ -31,7 +31,7 @@ export function buildClientKeyShare(
   assertLength(x25519.publicKey, X25519_BYTES, 'Client X25519 public key');
   assertLength(mlkem.publicKey, MLKEM768_PUBKEY_BYTES, 'Client ML-KEM public key');
 
-  // draft-ietf-tls-ecdhe-mlkem: for X25519MLKEM768 the ML-KEM share comes
+  // RFC 10024 §4: for X25519MLKEM768 the ML-KEM share comes
   // FIRST, then X25519 — the reverse of the usual hybrid naming convention,
   // kept that way for historical reasons.
   const keyShare = concatBytes(mlkem.publicKey, x25519.publicKey);
