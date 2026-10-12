@@ -8,6 +8,29 @@ import {
   watchPageErrors,
 } from './gate';
 
+test('reduced-motion playback never inserts a transparent shell', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.addInitScript(() => {
+    const samples: string[] = [];
+    Object.assign(window, { shellOpacitySamples: samples });
+    new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        for (const node of mutation.addedNodes) {
+          if (!(node instanceof Element)) continue;
+          const shell = node.matches('.shell') ? node : node.querySelector('.shell');
+          if (shell) samples.push(getComputedStyle(shell).opacity);
+        }
+      }
+    }).observe(document, { childList: true, subtree: true });
+  });
+  await boot(page, 'dark');
+  await page.locator('#autoBtn').click();
+  await expect(page.locator('.step-title')).toHaveText(/Step 3 of 3/);
+  const samples = await page.evaluate(() => (window as unknown as { shellOpacitySamples: string[] }).shellOpacitySamples);
+  expect(samples.length, 'arrival, start and both playback updates were observed').toBeGreaterThanOrEqual(4);
+  expect(samples.every((opacity) => opacity === '1'), `inserted shell opacity: ${samples.join(', ')}`).toBe(true);
+});
+
 /**
  * WCAG A/AA regression gate.
  *

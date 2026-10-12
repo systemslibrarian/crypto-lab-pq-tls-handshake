@@ -862,6 +862,14 @@ caption {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  /* Playback replaces the shell on every step. Clamping its fade to 0.01ms
+     still exposes a newly inserted shell at the transparent first keyframe.
+     Keep every update fully visible for readers who request reduced motion. */
+  .shell {
+    animation: none;
+    opacity: 1;
+  }
+
   *,
   *::before,
   *::after {
