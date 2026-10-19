@@ -8,7 +8,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "tsx scripts/phase-checks.ts phase1 && tsx scripts/phase-checks.ts phase2 && tsx scripts/phase-checks.ts phase3 && tsx scripts/phase-checks.ts phase7",
+    "test": "tsx scripts/phase-checks.ts phase1 && tsx scripts/phase-checks.ts phase2 && tsx scripts/phase-checks.ts phase3 && tsx scripts/phase-checks.ts phase7 && tsx scripts/phase-checks.ts rfc5869",
     "verify:phase1": "tsx scripts/phase-checks.ts phase1",
     "verify:phase2": "tsx scripts/phase-checks.ts phase2",
     "verify:phase3": "tsx scripts/phase-checks.ts phase3",

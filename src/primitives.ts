@@ -114,12 +114,29 @@ export function mlkem768Decapsulate(ciphertext: Uint8Array, secretKey: Uint8Arra
 }
 
 export async function hkdfExtract(salt: Uint8Array, ikm: Uint8Array): Promise<Uint8Array> {
-  const mac = await hmacSha256(salt, ikm);
+  /* An ABSENT salt is HashLen zeros, not an empty key. RFC 5869 section 2.2
+   * defines `salt` as "optional (if not provided, it is set to a string of
+   * HashLen zeros)", and its own Test Case 3 is exactly that case. Passing the
+   * empty array straight to WebCrypto instead threw `Zero-length key is not
+   * supported`, so this function could not compute the RFC's third published
+   * vector at all -- found by pinning those vectors rather than by reading the
+   * code.
+   *
+   * No existing caller is affected: every call site passes a 32-byte salt
+   * (handshake.ts uses `zeros` and a derived secret, phase-checks uses
+   * `new Uint8Array(32)`), so no handshake output moves. This only makes the
+   * documented default reachable. */
+  const effectiveSalt = salt.length === 0 ? new Uint8Array(HASH_SIZE) : salt;
+  const mac = await hmacSha256(effectiveSalt, ikm);
   ensureLength(mac, HASH_SIZE, 'HKDF-Extract output');
   return mac;
 }
 
-async function hkdfExpand(prk: Uint8Array, info: Uint8Array, length: number): Promise<Uint8Array> {
+/* Exported so the RFC 5869 Appendix A vectors can exercise the Expand half
+ * directly. Before this, only HKDF-Expand-Label was reachable from a test, and
+ * that is the TLS 1.3 wrapper rather than the primitive the RFC publishes
+ * ground truth for. */
+export async function hkdfExpand(prk: Uint8Array, info: Uint8Array, length: number): Promise<Uint8Array> {
   if (length <= 0) {
     return new Uint8Array();
   }
