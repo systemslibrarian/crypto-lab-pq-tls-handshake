@@ -4,6 +4,7 @@ import {
   MLKEM768_CIPHERTEXT_BYTES,
   MLKEM768_SECRET_BYTES,
   SERVER_KEYSHARE_BYTES,
+  concatBytes,
   deriveSecret,
   equalBytes,
   hkdfExpand,
@@ -12,6 +13,7 @@ import {
   mlkem768Decapsulate,
   mlkem768Encapsulate,
   mlkem768Keygen,
+  sha256,
   x25519Keygen,
   x25519SharedSecret,
 } from '../src/primitives';
@@ -23,6 +25,9 @@ import {
 } from '../src/hybrid';
 import {
   benchmarkKeyExchange,
+  buildClientHello,
+  buildServerHello,
+  clientProcessServerHello,
   runClassicalHandshake,
   runFullHandshake,
 } from '../src/handshake';
@@ -103,8 +108,12 @@ async function runPhase1(): Promise<void> {
   const tamperedShared = mlkem768Decapsulate(tampered, mlkem.secretKey);
   assert(!equalBytes(tamperedShared, dec), 'Tampered ciphertext did not change decapsulation output');
 
-  const extracted = await hkdfExtract(new Uint8Array(32), new Uint8Array());
-  assert(extracted.length === 32, 'HKDF-Extract output must be 32 bytes');
+  // RFC 8448's no-PSK TLS 1.3 trace starts with HKDF-Extract(0, 0), where
+  // each 0 is Hash.length bytes — not an empty IKM.
+  const zeros = new Uint8Array(32);
+  const expectedEarlySecret = fromHex('33 ad 0a 1c 60 7e c0 3b 09 e6 cd 98 93 68 0c e2 10 ad f3 00 aa 1f 26 60 e1 b2 2e 10 f1 70 f9 2a');
+  const extracted = await hkdfExtract(zeros, zeros);
+  assert(equalBytes(extracted, expectedEarlySecret), 'No-PSK Early Secret does not match the published TLS 1.3 trace');
 
   // RFC 8448 page 4: derive secret for handshake "tls13 derived"
   const prk = fromHex('33 ad 0a 1c 60 7e c0 3b 09 e6 cd 98 93 68 0c e2 10 ad f3 00 aa 1f 26 60 e1 b2 2e 10 f1 70 f9 2a');
@@ -114,7 +123,17 @@ async function runPhase1(): Promise<void> {
   assert(equalBytes(expanded, expected), 'HKDF-Expand-Label RFC 8448 vector mismatch');
 
   const derived = await deriveSecret(prk, 'derived', new Uint8Array());
-  assert(derived.length === 32, 'Derive-Secret output must be 32 bytes');
+  assert(equalBytes(derived, expected), 'Derive-Secret RFC 8448 vector mismatch');
+
+  let rejectedInvalidExpand = 0;
+  for (const [shortPrk, length] of [[new Uint8Array(31), 32], [new Uint8Array(32), -1], [new Uint8Array(32), 1.5]] as const) {
+    try {
+      await hkdfExpand(shortPrk, new Uint8Array(), length);
+    } catch {
+      rejectedInvalidExpand += 1;
+    }
+  }
+  assert(rejectedInvalidExpand === 3, 'HKDF-Expand accepted an invalid PRK or output length');
 
   console.log('phase-1 gates: PASS');
 }
@@ -151,11 +170,39 @@ async function runPhase3(): Promise<void> {
   const full = await runFullHandshake();
   const classical = await runClassicalHandshake();
 
-  assert(full.hybridShared.length === HYBRID_SHARED_BYTES, 'Full handshake hybrid length mismatch');
+  assert(full.hybridShared.length === HYBRID_SHARED_BYTES, 'Hybrid key-exchange secret length mismatch');
   assert(full.clientHello.extensions.key_share.key_exchange.length === CLIENT_KEYSHARE_BYTES, 'Client key share size mismatch');
   assert(full.serverHello.extensions.key_share.key_exchange.length === SERVER_KEYSHARE_BYTES, 'Server key share size mismatch');
   assert(full.clientHandshakeTrafficSecret.length === 32, 'Client handshake traffic secret length mismatch');
   assert(full.serverHandshakeTrafficSecret.length === 32, 'Server handshake traffic secret length mismatch');
+
+  const expectedEarlySecret = fromHex('33 ad 0a 1c 60 7e c0 3b 09 e6 cd 98 93 68 0c e2 10 ad f3 00 aa 1f 26 60 e1 b2 2e 10 f1 70 f9 2a');
+  assert(equalBytes(full.earlySecret, expectedEarlySecret), 'Key-exchange flow used the wrong no-PSK Early Secret');
+
+  const expectedTranscriptHash = await sha256(concatBytes(full.clientHello.handshakeBytes, full.serverHello.handshakeBytes));
+  const recordInclusiveHash = await sha256(concatBytes(full.clientHello.rawBytes, full.serverHello.rawBytes));
+  assert(equalBytes(full.transcriptHash, expectedTranscriptHash), 'Transcript hash must cover handshake messages');
+  assert(!equalBytes(full.transcriptHash, recordInclusiveHash), 'Transcript hash must exclude TLS record headers');
+  assert(toHex(full.clientHello.rawBytes.subarray(1, 3)) === '0301', 'Initial ClientHello record version must be 0x0301');
+  assert(toHex(full.serverHello.rawBytes.subarray(1, 3)) === '0303', 'ServerHello record version must be 0x0303');
+
+  const client = await buildClientHello();
+  const server = await buildServerHello(client.clientHello);
+  const mismatchedServerSecret = server.serverHybridShared.slice();
+  mismatchedServerSecret[0] ^= 1;
+  let rejectedMismatch = false;
+  try {
+    await clientProcessServerHello(
+      server.serverHello,
+      client.clientHello,
+      client.x25519,
+      client.mlkem,
+      mismatchedServerSecret,
+    );
+  } catch (error) {
+    rejectedMismatch = /mismatch/.test(String(error));
+  }
+  assert(rejectedMismatch, 'Key schedule continued after a client/server hybrid-secret mismatch');
 
   assert(full.clientHello.rawBytes.length >= 1250 && full.clientHello.rawBytes.length <= 1300, `ClientHello size out of expected range: ${full.clientHello.rawBytes.length}`);
   assert(full.serverHello.rawBytes.length >= 1150 && full.serverHello.rawBytes.length <= 1200, `ServerHello size out of expected range: ${full.serverHello.rawBytes.length}`);
@@ -237,10 +284,11 @@ async function runPhase7Checks(): Promise<void> {
   const testContext = fromHex('e3 b0 c4 42 98 fc 1c 14 9a fb f4 c8 99 6f b9 24 27 ae 41 e4 64 9b 93 4c a4 95 99 1b 78 52 b8 55');
   const testExpected = fromHex('6f 26 15 a1 08 c7 02 c5 67 8f 54 fc 9d ba b6 97 16 c0 76 18 9c 48 25 0c eb ea c3 57 6c 36 11 ba');
   const expanded = await hkdfExpandLabel(testPrk, 'derived', testContext, 32);
+  const noPskEarlySecret = await hkdfExtract(new Uint8Array(32), new Uint8Array(32));
   checks.push({
     name: '8. HKDF-Extract and HKDF-Expand-Label produce correct output',
-    pass: (await hkdfExtract(new Uint8Array(32), new Uint8Array())).length === 32 && equalBytes(expanded, testExpected),
-    detail: 'RFC 8448 derived label vector matched',
+    pass: equalBytes(noPskEarlySecret, testPrk) && equalBytes(expanded, testExpected),
+    detail: 'RFC 8448 no-PSK Early Secret and derived-label vectors matched',
   });
 
   checks.push({
@@ -268,6 +316,20 @@ async function runPhase7Checks(): Promise<void> {
     name: '12. Key-exchange compute is a live measurement',
     pass: Number.isFinite(bench.hybridMs) && bench.hybridMs > 0 && bench.hybridMs >= bench.classicalMs,
     detail: `hybrid ${bench.hybridMs.toFixed(3)}ms >= classical ${bench.classicalMs.toFixed(3)}ms`,
+  });
+
+  const expectedTranscriptHash = await sha256(concatBytes(full.clientHello.handshakeBytes, full.serverHello.handshakeBytes));
+  const recordInclusiveHash = await sha256(concatBytes(full.clientHello.rawBytes, full.serverHello.rawBytes));
+  checks.push({
+    name: '13. Transcript hash excludes TLS record headers',
+    pass: equalBytes(full.transcriptHash, expectedTranscriptHash) && !equalBytes(full.transcriptHash, recordInclusiveHash),
+    detail: 'handshake headers included; five-byte record headers excluded',
+  });
+
+  checks.push({
+    name: '14. TLS record legacy versions match RFC 9846',
+    pass: toHex(full.clientHello.rawBytes.subarray(1, 3)) === '0301' && toHex(full.serverHello.rawBytes.subarray(1, 3)) === '0303',
+    detail: 'initial ClientHello 0x0301; ServerHello 0x0303',
   });
 
   for (const check of checks) {
