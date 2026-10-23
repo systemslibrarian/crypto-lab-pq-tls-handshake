@@ -1,5 +1,35 @@
 import { expect, test } from '@playwright/test';
 
+test('the skip link targets and focuses the rendered main content', async ({ page }) => {
+  await page.goto('.');
+  const skip = page.getByRole('link', { name: 'Skip to content' });
+  await expect(skip).toHaveAttribute('href', '#main-content');
+  await skip.focus();
+  await skip.press('Enter');
+  await expect(page.locator('#main-content')).toBeFocused();
+});
+
+test('the page scopes its claims to TLS key exchange', async ({ page }) => {
+  await page.goto('.');
+  const body = page.locator('body');
+  await expect(body).toContainText('hybrid key-exchange portion of TLS 1.3');
+  await expect(page.getByRole('heading', { name: 'Exhibit 1: Hybrid Key Exchange, Live' })).toBeVisible();
+  await expect(body).not.toContainText('Full Handshake');
+  await expect(body).not.toContainText('no protocol change');
+  await expect(body).toContainText('key schedule itself needs no redesign');
+});
+
+test('visible control text remains in every accessible name', async ({ page }) => {
+  await page.goto('.');
+  for (const name of ['Step', 'Auto-play', 'Reset']) {
+    await expect(page.getByRole('button', { name, exact: true })).toBeVisible();
+  }
+  await page.getByRole('checkbox', { name: 'Show wire bytes' }).check();
+  for (const name of ['0x11EC group', 'X25519 split', 'ML-KEM split']) {
+    await expect(page.getByRole('button', { name, exact: true })).toBeVisible();
+  }
+});
+
 /**
  * The page's own README warns that for X25519MLKEM768 the ML-KEM share comes
  * FIRST, and that an implementation concatenating in name order will not

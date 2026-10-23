@@ -22,7 +22,8 @@ import {
 
 const TLS13 = 0x0304;
 const TLS12_LEGACY_VERSION = 0x0303;
-const RECORD_TLS12 = 0x0301;
+const INITIAL_CLIENT_RECORD_VERSION = 0x0301;
+const TLS13_RECORD_VERSION = 0x0303;
 const HANDSHAKE_CONTENT_TYPE = 0x16;
 const CLIENT_HELLO_TYPE = 0x01;
 const SERVER_HELLO_TYPE = 0x02;
@@ -43,6 +44,9 @@ export interface ClientHello {
       key_exchange: Uint8Array;
     };
   };
+  /** Handshake message including its 4-byte type/length header, without the record header. */
+  handshakeBytes: Uint8Array;
+  /** Full plaintext TLS record, including its 5-byte record-layer header. */
   rawBytes: Uint8Array;
 }
 
@@ -58,6 +62,9 @@ export interface ServerHello {
       key_exchange: Uint8Array;
     };
   };
+  /** Handshake message including its 4-byte type/length header, without the record header. */
+  handshakeBytes: Uint8Array;
+  /** Full plaintext TLS record, including its 5-byte record-layer header. */
   rawBytes: Uint8Array;
 }
 
@@ -114,12 +121,27 @@ function encodeExtension(type: number, data: Uint8Array): Uint8Array {
   return concatBytes(u16(type), encodeVector(data, 2));
 }
 
-function buildHandshakeRecord(handshakeType: number, body: Uint8Array): Uint8Array {
-  const handshake = concatBytes(new Uint8Array([handshakeType]), u24(body.length), body);
-  return concatBytes(new Uint8Array([HANDSHAKE_CONTENT_TYPE]), u16(RECORD_TLS12), u16(handshake.length), handshake);
+interface SerializedHandshake {
+  handshakeBytes: Uint8Array;
+  rawBytes: Uint8Array;
 }
 
-function serializeClientHello(clientHello: Omit<ClientHello, 'rawBytes'>): Uint8Array {
+function buildHandshakeRecord(
+  handshakeType: number,
+  body: Uint8Array,
+  recordVersion: number,
+): SerializedHandshake {
+  const handshakeBytes = concatBytes(new Uint8Array([handshakeType]), u24(body.length), body);
+  const rawBytes = concatBytes(
+    new Uint8Array([HANDSHAKE_CONTENT_TYPE]),
+    u16(recordVersion),
+    u16(handshakeBytes.length),
+    handshakeBytes,
+  );
+  return { handshakeBytes, rawBytes };
+}
+
+function serializeClientHello(clientHello: Omit<ClientHello, 'handshakeBytes' | 'rawBytes'>): SerializedHandshake {
   const cipherBytes = new Uint8Array(clientHello.cipher_suites.length * 2);
   for (let i = 0; i < clientHello.cipher_suites.length; i += 1) {
     const suite = clientHello.cipher_suites[i];
@@ -156,10 +178,12 @@ function serializeClientHello(clientHello: Omit<ClientHello, 'rawBytes'>): Uint8
     encodeVector(extensions, 2),
   );
 
-  return buildHandshakeRecord(CLIENT_HELLO_TYPE, body);
+  // RFC 9846 allows 0x0301 only on the initial ClientHello record for
+  // compatibility with old middleboxes.
+  return buildHandshakeRecord(CLIENT_HELLO_TYPE, body, INITIAL_CLIENT_RECORD_VERSION);
 }
 
-function serializeServerHello(serverHello: Omit<ServerHello, 'rawBytes'>): Uint8Array {
+function serializeServerHello(serverHello: Omit<ServerHello, 'handshakeBytes' | 'rawBytes'>): SerializedHandshake {
   const supportedVersionsPayload = u16(serverHello.extensions.supported_versions);
   const keyExchange = serverHello.extensions.key_share.key_exchange;
   const keySharePayload = concatBytes(
@@ -182,7 +206,8 @@ function serializeServerHello(serverHello: Omit<ServerHello, 'rawBytes'>): Uint8
     encodeVector(extensions, 2),
   );
 
-  return buildHandshakeRecord(SERVER_HELLO_TYPE, body);
+  // Every other TLS 1.3 record, including ServerHello, must carry 0x0303.
+  return buildHandshakeRecord(SERVER_HELLO_TYPE, body, TLS13_RECORD_VERSION);
 }
 
 export async function buildClientHello(): Promise<{
@@ -198,7 +223,7 @@ export async function buildClientHello(): Promise<{
     throw new Error(`Client key share must be ${CLIENT_KEYSHARE_BYTES} bytes`);
   }
 
-  const noRaw: Omit<ClientHello, 'rawBytes'> = {
+  const noRaw: Omit<ClientHello, 'handshakeBytes' | 'rawBytes'> = {
     version: TLS12_LEGACY_VERSION,
     random: randomBytes(32),
     legacy_session_id: new Uint8Array(),
@@ -213,8 +238,8 @@ export async function buildClientHello(): Promise<{
     },
   };
 
-  const rawBytes = serializeClientHello(noRaw);
-  return { clientHello: { ...noRaw, rawBytes }, x25519, mlkem };
+  const serialized = serializeClientHello(noRaw);
+  return { clientHello: { ...noRaw, ...serialized }, x25519, mlkem };
 }
 
 export async function buildServerHello(
@@ -236,7 +261,7 @@ export async function buildServerHello(
     throw new Error(`Server key share must be ${SERVER_KEYSHARE_BYTES} bytes`);
   }
 
-  const noRaw: Omit<ServerHello, 'rawBytes'> = {
+  const noRaw: Omit<ServerHello, 'handshakeBytes' | 'rawBytes'> = {
     version: TLS12_LEGACY_VERSION,
     random: randomBytes(32),
     legacy_session_id_echo: clientHello.legacy_session_id,
@@ -250,8 +275,8 @@ export async function buildServerHello(
     },
   };
 
-  const rawBytes = serializeServerHello(noRaw);
-  return { serverHello: { ...noRaw, rawBytes }, serverHybridShared };
+  const serialized = serializeServerHello(noRaw);
+  return { serverHello: { ...noRaw, ...serialized }, serverHybridShared };
 }
 
 export async function clientProcessServerHello(
@@ -261,6 +286,22 @@ export async function clientProcessServerHello(
   mlkem: MLKEM768Keypair,
   serverHybridShared: Uint8Array,
 ): Promise<HandshakeResult> {
+  if (serverHello.version !== TLS12_LEGACY_VERSION) {
+    throw new Error('Invalid ServerHello legacy version: expected 0x0303');
+  }
+  if (serverHello.extensions.supported_versions !== TLS13) {
+    throw new Error('ServerHello did not negotiate TLS 1.3');
+  }
+  if (serverHello.extensions.key_share.group !== clientHello.extensions.key_share.group) {
+    throw new Error('ServerHello selected a key-share group that the client did not offer');
+  }
+  if (!clientHello.cipher_suites.includes(serverHello.cipher_suite)) {
+    throw new Error('ServerHello selected a cipher suite that the client did not offer');
+  }
+  if (!equalBytes(serverHello.legacy_session_id_echo, clientHello.legacy_session_id)) {
+    throw new Error('ServerHello legacy session ID does not match ClientHello');
+  }
+
   const { hybridShared, x25519Component, mlkemComponent } = clientComputeHybridSecret(
     serverHello.extensions.key_share.key_exchange,
     x25519,
@@ -271,17 +312,26 @@ export async function clientProcessServerHello(
   }
 
   const secretsAgree = equalBytes(hybridShared, serverHybridShared);
+  if (!secretsAgree) {
+    throw new Error('Client/server hybrid shared secret mismatch');
+  }
 
-  const transcript = concatBytes(clientHello.rawBytes, serverHello.rawBytes);
+  // RFC 9846 §4.1 hashes handshake messages (including their own 4-byte
+  // headers) but explicitly excludes the surrounding 5-byte record headers.
+  const transcript = concatBytes(clientHello.handshakeBytes, serverHello.handshakeBytes);
   const transcriptHash = await sha256(transcript);
 
   const zeros = new Uint8Array(32);
-  const psk = new Uint8Array();
+  // RFC 9846 §7.1 represents an unavailable PSK as Hash.length zero bytes. An
+  // empty IKM produces a different Early Secret and is not HKDF-Extract(0, 0)
+  // from the published TLS 1.3 schedule.
+  const noPsk = new Uint8Array(32);
 
   // RFC 9846 §7.1 key schedule, run verbatim: the hybrid secret is fed in as
   // the (EC)DHE input to HKDF-Extract exactly where a classical shared secret
-  // would go — this is the "no protocol change" property, made concrete.
-  const earlySecret = await hkdfExtract(zeros, psk);
+  // would go. Hybrid negotiation and wire encoding are still protocol changes;
+  // the key schedule itself needs no redesign.
+  const earlySecret = await hkdfExtract(zeros, noPsk);
   const derivedSecret = await deriveSecret(earlySecret, 'derived', new Uint8Array());
   const handshakeSecret = await hkdfExtract(derivedSecret, hybridShared);
   const clientHandshakeTrafficSecret = await deriveSecret(handshakeSecret, 'c hs traffic', transcript);
@@ -312,14 +362,11 @@ export async function runFullHandshake(): Promise<HandshakeResult> {
   const { serverHello, serverHybridShared } = await buildServerHello(clientHello);
   const result = await clientProcessServerHello(serverHello, clientHello, x25519, mlkem, serverHybridShared);
 
-  if (!result.secretsAgree) {
-    throw new Error('Client/server hybrid shared secret mismatch');
-  }
   return result;
 }
 
 /**
- * Build a real, byte-for-byte X25519-only TLS 1.3 handshake through the exact
+ * Build a real, byte-for-byte X25519-only TLS 1.3 hello exchange through the exact
  * same serializer as the hybrid path, so the size comparison reflects genuine
  * wire bytes rather than a guessed constant. The only differences from the
  * hybrid ClientHello are the advertised group (0x001D) and the 32-byte key
@@ -331,7 +378,7 @@ export async function runClassicalHandshake(): Promise<{
   totalBytes: number;
 }> {
   const clientX25519 = x25519Keygen();
-  const clientHello: Omit<ClientHello, 'rawBytes'> = {
+  const clientHello: Omit<ClientHello, 'handshakeBytes' | 'rawBytes'> = {
     version: TLS12_LEGACY_VERSION,
     random: randomBytes(32),
     legacy_session_id: new Uint8Array(),
@@ -344,7 +391,7 @@ export async function runClassicalHandshake(): Promise<{
   };
 
   const serverX25519 = x25519Keygen();
-  const serverHello: Omit<ServerHello, 'rawBytes'> = {
+  const serverHello: Omit<ServerHello, 'handshakeBytes' | 'rawBytes'> = {
     version: TLS12_LEGACY_VERSION,
     random: randomBytes(32),
     legacy_session_id_echo: new Uint8Array(),
@@ -355,8 +402,8 @@ export async function runClassicalHandshake(): Promise<{
     },
   };
 
-  const clientHelloBytes = serializeClientHello(clientHello).length;
-  const serverHelloBytes = serializeServerHello(serverHello).length;
+  const clientHelloBytes = serializeClientHello(clientHello).rawBytes.length;
+  const serverHelloBytes = serializeServerHello(serverHello).rawBytes.length;
   return { clientHelloBytes, serverHelloBytes, totalBytes: clientHelloBytes + serverHelloBytes };
 }
 
