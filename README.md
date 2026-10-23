@@ -2,9 +2,9 @@
 
 ## What It Is
 
-Browser-based simulation of the TLS 1.3 handshake using the X25519MLKEM768 hybrid post-quantum key exchange specified in [RFC 10024](https://www.rfc-editor.org/rfc/rfc10024.html) (IETF Standards Track, August 2026; named group codepoint 0x11EC).
+Browser-based simulation of the TLS 1.3 key-exchange flow using the X25519MLKEM768 hybrid post-quantum key exchange specified in [RFC 10024](https://www.rfc-editor.org/rfc/rfc10024.html) (IETF Standards Track, August 2026; named group codepoint 0x11EC).
 
-This project demonstrates both sides of a TLS 1.3 handshake entirely in-browser (no backend server) using the hybrid key exchange `X25519MLKEM768`:
+This project demonstrates both sides of the key-exchange portion of TLS 1.3 entirely in-browser (no backend server) using the hybrid key exchange `X25519MLKEM768`. It does not model certificate authentication, Finished messages, or application traffic:
 
 - Client key share construction:
   - `ML-KEM-768_pub (1184)` + `X25519_pub (32)` = `1216` bytes
@@ -24,9 +24,9 @@ A **"Why does this exist?"** intro and a hoverable glossary front the page: a fu
 
 ## Exhibits
 
-1. **Full Handshake, Live** — step through the three stages (generate ephemeral keypairs → send the ClientHello, which jumps the wire inspector to the `0x11EC` named group → both sides independently derive the *same* 64-byte secret, shown side by side with a match check).
+1. **Hybrid Key Exchange, Live** — step through the three stages (generate ephemeral keypairs → send the ClientHello, which jumps the wire inspector to the `0x11EC` named group → both sides independently derive the *same* 64-byte secret, shown side by side with a match check).
 2. **Why Hybrid?** — the threat-scenario survival table: each adversary/failure mode against a plain Secure/Broken outcome, so "safe if either primitive holds" reads straight off the rows.
-3. **Building the Hybrid Secret** — animates the 32-byte ML-KEM secret (purple) and 32-byte X25519 secret (blue) concatenating, in the RFC 10024 order, into the 64-byte hybrid value, which flows as one input into `HKDF-Extract` and out to the handshake and traffic secrets. Every hex preview is the real value derived this run — making the `|| then HKDF` "no protocol change" pipeline visible.
+3. **Building the Hybrid Secret** — animates the 32-byte ML-KEM secret (purple) and 32-byte X25519 secret (blue) concatenating, in the RFC 10024 order, into the 64-byte hybrid value, which flows as one input into `HKDF-Extract` and out to the handshake and traffic secrets. Every hex preview is the real value derived this run — showing that the standard TLS 1.3 key schedule needs no redesign even though hybrid negotiation and wire encoding use a new named group.
 4. **Size and Compute Impact** — measured key-share sizes and live compute timing, with an MTU visual drawing the 1216-byte hybrid ClientHello against a ~1500-byte packet boundary next to the tiny classical one.
 5. **Wire Format Inspector** — a hex dump of the real serialized `ClientHello`, every offset and length computed from the actual bytes, with colour-coded named-group / X25519 / ML-KEM highlights.
 6. **Deployment Reality** — current browser and CDN adoption, and the IETF codepoint story.
@@ -45,7 +45,7 @@ Use this demo when you want to:
 - Understand what modern browsers and CDNs are negotiating on real HTTPS connections today
 - Teach hybrid PQ migration strategy for TLS 1.3 deployments
 - Inspect byte-level handshake framing and the `0x11EC` group on the wire
-- Study why TLS 1.3 key schedule logic does not need protocol changes for hybrid shared secrets
+- Study why TLS 1.3 key schedule logic does not need redesign for hybrid shared secrets
 - Compare classical and hybrid handshake size/latency behavior in a single interactive tool
 - Do NOT use this for production TLS — this is an educational simulation, not a hardened TLS stack. For production, use established libraries and runtimes.
 
@@ -53,7 +53,7 @@ Use this demo when you want to:
 
 **[systemslibrarian.github.io/crypto-lab-pq-tls-handshake](https://systemslibrarian.github.io/crypto-lab-pq-tls-handshake/)**
 
-The demo runs both client and server sides of an X25519MLKEM768 TLS 1.3 handshake in the browser. A wire-format inspector dumps the real serialized `ClientHello` with every byte offset and length (including the `0x11EC` group position), a classical X25519 comparison serialized through the same encoder shows the measured size difference, and live `performance.now()` timing reports real keygen / encapsulation / decapsulation cost. The hybrid shared secret feeds the standard RFC 9846 key schedule unchanged, illustrating why TLS 1.3 needs no protocol changes to adopt hybrid PQC.
+The demo runs both client and server sides of the X25519MLKEM768 key exchange used by TLS 1.3 in the browser. A wire-format inspector dumps the real serialized `ClientHello` with every byte offset and length (including the `0x11EC` group position), a classical X25519 comparison serialized through the same encoder shows the measured size difference, and live `performance.now()` timing reports real keygen / encapsulation / decapsulation cost. The hybrid shared secret feeds the standard RFC 9846 key schedule unchanged, illustrating why the key schedule needs no redesign; the demo does not claim to implement certificate authentication, Finished messages, or a production TLS connection.
 
 ## What Can Go Wrong
 
@@ -95,9 +95,10 @@ npm run build       # type-check + production bundle
 ```
 
 `npm test` runs every gate in `scripts/phase-checks.ts`, including the RFC 8448
-`HKDF-Expand-Label` test vector, a 100-iteration client/server agreement loop,
-exact key-share sizes (1216 / 1120 / 64 bytes), a live compute measurement, and
-a source scan that rejects `Math.random`. The same gates run in CI
+no-PSK Early Secret and `HKDF-Expand-Label` test vectors, a 100-iteration
+client/server agreement loop, exact key-share sizes (1216 / 1120 / 64 bytes),
+TLS record-version and transcript-boundary checks, fail-closed secret agreement,
+a live compute measurement, and a source scan that rejects `Math.random`. The same gates run in CI
 (`.github/workflows/deploy.yml`) and **must pass before GitHub Pages deploys**.
 
 ## License

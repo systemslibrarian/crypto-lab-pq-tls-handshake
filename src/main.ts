@@ -187,9 +187,9 @@ function createWireBytesBlock(result: HandshakeResult): string {
 
   const chips = `
     <div class="inspector-toggle">
-      <button data-inspector="group" class="chip ${groupClass}" aria-pressed="${groupClass ? 'true' : 'false'}" aria-label="Highlight named group bytes 0x11EC">0x11EC group</button>
-      <button data-inspector="x25519" class="chip ${xClass}" aria-pressed="${xClass ? 'true' : 'false'}" aria-label="Highlight X25519 public key bytes">X25519 split</button>
-      <button data-inspector="mlkem" class="chip ${mClass}" aria-pressed="${mClass ? 'true' : 'false'}" aria-label="Highlight ML-KEM public key bytes">ML-KEM split</button>
+      <button data-inspector="group" class="chip ${groupClass}" aria-pressed="${groupClass ? 'true' : 'false'}">0x11EC group</button>
+      <button data-inspector="x25519" class="chip ${xClass}" aria-pressed="${xClass ? 'true' : 'false'}">X25519 split</button>
+      <button data-inspector="mlkem" class="chip ${mClass}" aria-pressed="${mClass ? 'true' : 'false'}">ML-KEM split</button>
     </div>`;
 
   if (keyOffset < 0) {
@@ -300,11 +300,12 @@ function buildHybridSecretExhibit(result: HandshakeResult): string {
   const sHex = preview(result.serverHandshakeTrafficSecret, 6, 6);
 
   return `
-    <p>This is the step the whole handshake is named after. Two shared secrets — one
+    <p>This is the key-exchange step at the center of the demo. Two shared secrets — one
     from each primitive — are laid end to end (<code>||</code> means concatenate),
     and the joined 64-byte value is fed into the TLS 1.3 key schedule <strong>exactly
-    where a single classical secret used to go</strong>. That substitution, and nothing
-    else, is why TLS 1.3 needed <em>no protocol change</em> to go post-quantum.</p>
+    where a single classical secret used to go</strong>. Hybrid negotiation and wire
+    encoding use a new named group, but the key schedule itself needs
+    <em>no redesign</em>.</p>
 
     <div class="hybrid-flow">
       <div class="hybrid-inputs">
@@ -389,12 +390,12 @@ function render(): void {
   const bytesOverhead = signedPct(r.totalBytes - state.classical.totalBytes, state.classical.totalBytes);
 
   appRoot.innerHTML = `
-    <main class="shell" aria-label="Post-quantum TLS handshake simulation">
+    <main id="main-content" class="shell" tabindex="-1" aria-label="Post-quantum TLS key-exchange simulation">
       <header class="cl-hero">
         <div class="cl-hero-main">
           <h1 class="cl-hero-title">X25519MLKEM768</h1>
           <p class="cl-hero-sub">Hybrid PQ key exchange · TLS 1.3 · X25519 + ML-KEM-768</p>
-          <p class="cl-hero-desc">A browser simulation of the real hybrid handshake — watch the client combine an X25519 and an ML-KEM-768 key share on the wire and feed the concatenated secret into the TLS 1.3 key schedule.</p>
+          <p class="cl-hero-desc">A browser simulation of the hybrid key-exchange portion of TLS 1.3 — watch the client combine an X25519 and an ML-KEM-768 key share on the wire and feed the concatenated secret into the TLS 1.3 key schedule.</p>
         </div>
         <aside class="cl-hero-why" aria-label="Why it matters">
           <span class="cl-hero-why-label">WHY IT MATTERS</span>
@@ -404,10 +405,10 @@ function render(): void {
 
       <div class="hero-controls">
         <div class="controls">
-          <button id="stepBtn" class="btn" aria-label="Advance to the next handshake step">Step</button>
-          <button id="autoBtn" class="btn" aria-label="Toggle automatic step playback" aria-pressed="${state.autoPlay ? 'true' : 'false'}">${state.autoPlay ? 'Stop Auto-play' : 'Auto-play'}</button>
-          <button id="resetBtn" class="btn" aria-label="Restart the handshake simulation">Reset</button>
-          <label class="toggle"><input id="wireToggle" type="checkbox" aria-label="Show wire-format bytes" ${state.showWireBytes ? 'checked' : ''}/> Show wire bytes</label>
+          <button id="stepBtn" class="btn">Step</button>
+          <button id="autoBtn" class="btn" aria-pressed="${state.autoPlay ? 'true' : 'false'}">${state.autoPlay ? 'Stop Auto-play' : 'Auto-play'}</button>
+          <button id="resetBtn" class="btn">Reset</button>
+          <label class="toggle"><input id="wireToggle" type="checkbox" ${state.showWireBytes ? 'checked' : ''}/> Show wire bytes</label>
         </div>
       </div>
 
@@ -446,7 +447,7 @@ function render(): void {
       </section>
 
       <section class="exhibit narrative" aria-live="polite" aria-atomic="true">
-        <h3>Exhibit 1: Full Handshake, Live</h3>
+        <h3>Exhibit 1: Hybrid Key Exchange, Live</h3>
         ${stepNarrative(r)}
       </section>
 
@@ -507,7 +508,7 @@ function render(): void {
       </section>
 
       <section class="exhibit footnote">
-        <p>Transcript hash (SHA-256 ClientHello||ServerHello): <code>${preview(r.transcriptHash, 12, 12)}</code></p>
+        <p>Transcript hash (SHA-256 over the ClientHello and ServerHello handshake messages; record headers excluded): <code>${preview(r.transcriptHash, 12, 12)}</code></p>
       </section>
     </main>
 <footer class="site-footer">
