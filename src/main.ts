@@ -187,9 +187,9 @@ function createWireBytesBlock(result: HandshakeResult): string {
 
   const chips = `
     <div class="inspector-toggle">
-      <button data-inspector="group" class="chip ${groupClass}" aria-pressed="${groupClass ? 'true' : 'false'}" aria-label="Highlight named group bytes 0x11EC">0x11EC group</button>
-      <button data-inspector="x25519" class="chip ${xClass}" aria-pressed="${xClass ? 'true' : 'false'}" aria-label="Highlight X25519 public key bytes">X25519 split</button>
-      <button data-inspector="mlkem" class="chip ${mClass}" aria-pressed="${mClass ? 'true' : 'false'}" aria-label="Highlight ML-KEM public key bytes">ML-KEM split</button>
+      <button data-inspector="group" class="chip ${groupClass}" aria-pressed="${groupClass ? 'true' : 'false'}" aria-label="0x11EC group: highlight the named group bytes">0x11EC group</button>
+      <button data-inspector="x25519" class="chip ${xClass}" aria-pressed="${xClass ? 'true' : 'false'}" aria-label="X25519 split: highlight the X25519 public key bytes">X25519 split</button>
+      <button data-inspector="mlkem" class="chip ${mClass}" aria-pressed="${mClass ? 'true' : 'false'}" aria-label="ML-KEM split: highlight the ML-KEM public key bytes">ML-KEM split</button>
     </div>`;
 
   if (keyOffset < 0) {
@@ -405,8 +405,8 @@ function render(): void {
       <div class="hero-controls">
         <div class="controls">
           <button id="stepBtn" class="btn" aria-label="Advance to the next handshake step">Step</button>
-          <button id="autoBtn" class="btn" aria-label="Toggle automatic step playback" aria-pressed="${state.autoPlay ? 'true' : 'false'}">${state.autoPlay ? 'Stop Auto-play' : 'Auto-play'}</button>
-          <button id="resetBtn" class="btn" aria-label="Restart the handshake simulation">Reset</button>
+          <button id="autoBtn" class="btn" aria-label="${state.autoPlay ? 'Stop Auto-play' : 'Auto-play'}: automatic step playback" aria-pressed="${state.autoPlay ? 'true' : 'false'}">${state.autoPlay ? 'Stop Auto-play' : 'Auto-play'}</button>
+          <button id="resetBtn" class="btn" aria-label="Reset: restart the handshake simulation">Reset</button>
           <label class="toggle"><input id="wireToggle" type="checkbox" aria-label="Show wire-format bytes" ${state.showWireBytes ? 'checked' : ''}/> Show wire bytes</label>
         </div>
       </div>
