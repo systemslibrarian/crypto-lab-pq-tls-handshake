@@ -1,5 +1,70 @@
 import { expect, test } from '@playwright/test';
 
+test('the skip link targets and focuses the rendered main content', async ({ page }) => {
+  await page.goto('.');
+  const skip = page.getByRole('link', { name: 'Skip to content' });
+  await expect(skip).toHaveAttribute('href', '#main-content');
+  await skip.focus();
+  await skip.press('Enter');
+  await expect(page.locator('#main-content')).toBeFocused();
+});
+
+test('the page scopes its claims to TLS key exchange', async ({ page }) => {
+  await page.goto('.');
+  const body = page.locator('body');
+  await expect(body).toContainText('hybrid key-exchange portion of TLS 1.3');
+  await expect(page.getByRole('heading', { name: 'Exhibit 1: Hybrid Key Exchange, Live' })).toBeVisible();
+  await expect(body).not.toContainText('Full Handshake');
+  await expect(body).not.toContainText('no protocol change');
+  await expect(body).toContainText('key schedule itself needs no redesign');
+});
+
+test('visible control text remains in every accessible name', async ({ page }) => {
+  await page.goto('.');
+  await page.locator('#wireToggle').check();
+
+  /**
+   * WCAG 2.5.3 Label in Name: the accessible name must CONTAIN the visible
+   * label, not equal it. This asserted equality when it was written, which
+   * matched this branch's markup — then main's 4d12e09 gave each control a
+   * descriptive `aria-label` ("Reset: restart the handshake simulation"), which
+   * is both more useful to a screen-reader user and still conformant. Equality
+   * would have forced those labels back out to keep a test green.
+   *
+   * Derived from the page rather than from a list, so a control added later is
+   * covered without anyone remembering to add it here.
+   */
+  const controls = await page.locator('button, input[type="checkbox"]').evaluateAll((nodes) =>
+    nodes
+      .filter((node) => (node as HTMLElement).offsetParent !== null)
+      .map((node) => {
+        // A checkbox's visible label is the text of the <label> wrapping it.
+        const visibleSource = node.tagName === 'INPUT' ? node.closest('label') : node;
+        return {
+          visible: (visibleSource?.textContent ?? '').replace(/\s+/g, ' ').trim(),
+          accessible: (node.getAttribute('aria-label') ?? visibleSource?.textContent ?? '').replace(/\s+/g, ' ').trim(),
+        };
+      })
+      .filter((control) => control.visible.length > 0),
+  );
+
+  // A scan that found nothing would pass the rule below over nothing.
+  expect(controls.length).toBeGreaterThanOrEqual(6);
+  // Case-insensitive: WCAG 2.5.3 exists so a voice-control user can say the
+  // visible label, and voice input normalises case. "Advance to the next
+  // handshake step" does contain "Step" for that purpose.
+  const offenders = controls.filter(
+    (control) => !control.accessible.toLowerCase().includes(control.visible.toLowerCase()),
+  );
+  expect(offenders, `accessible names that drop their visible label: ${JSON.stringify(offenders)}`).toEqual([]);
+
+  // The controls this test was written for are among them.
+  const visibleLabels = controls.map((control) => control.visible);
+  for (const label of ['Step', 'Reset', '0x11EC group', 'X25519 split', 'ML-KEM split']) {
+    expect(visibleLabels, label).toContain(label);
+  }
+});
+
 /**
  * The page's own README warns that for X25519MLKEM768 the ML-KEM share comes
  * FIRST, and that an implementation concatenating in name order will not

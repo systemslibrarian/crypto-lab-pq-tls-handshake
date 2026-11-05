@@ -137,7 +137,13 @@ export async function hkdfExtract(salt: Uint8Array, ikm: Uint8Array): Promise<Ui
  * that is the TLS 1.3 wrapper rather than the primitive the RFC publishes
  * ground truth for. */
 export async function hkdfExpand(prk: Uint8Array, info: Uint8Array, length: number): Promise<Uint8Array> {
-  if (length <= 0) {
+  if (prk.length < HASH_SIZE) {
+    throw new Error(`HKDF-Expand PRK must be at least ${HASH_SIZE} bytes`);
+  }
+  if (!Number.isInteger(length) || length < 0) {
+    throw new Error(`Invalid HKDF-Expand length: ${length}`);
+  }
+  if (length === 0) {
     return new Uint8Array();
   }
 
@@ -168,7 +174,7 @@ export async function hkdfExpandLabel(
   context: Uint8Array,
   length: number,
 ): Promise<Uint8Array> {
-  if (length < 0 || length > 0xffff) {
+  if (!Number.isInteger(length) || length < 0 || length > 0xffff) {
     throw new Error(`Invalid HKDF-Expand-Label length: ${length}`);
   }
 
