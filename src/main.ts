@@ -408,7 +408,7 @@ function render(): void {
           <button id="stepBtn" class="btn" aria-label="Advance to the next handshake step">Step</button>
           <button id="autoBtn" class="btn" aria-label="${state.autoPlay ? 'Stop Auto-play' : 'Auto-play'}: automatic step playback" aria-pressed="${state.autoPlay ? 'true' : 'false'}">${state.autoPlay ? 'Stop Auto-play' : 'Auto-play'}</button>
           <button id="resetBtn" class="btn" aria-label="Reset: restart the handshake simulation">Reset</button>
-          <label class="toggle"><input id="wireToggle" type="checkbox" aria-label="Show wire-format bytes" ${state.showWireBytes ? 'checked' : ''}/> Show wire bytes</label>
+          <label class="toggle"><input id="wireToggle" type="checkbox" aria-label="Show wire bytes: the wire-format record bytes" ${state.showWireBytes ? 'checked' : ''}/> Show wire bytes</label>
         </div>
       </div>
 

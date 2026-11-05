@@ -21,12 +21,47 @@ test('the page scopes its claims to TLS key exchange', async ({ page }) => {
 
 test('visible control text remains in every accessible name', async ({ page }) => {
   await page.goto('.');
-  for (const name of ['Step', 'Auto-play', 'Reset']) {
-    await expect(page.getByRole('button', { name, exact: true })).toBeVisible();
-  }
-  await page.getByRole('checkbox', { name: 'Show wire bytes' }).check();
-  for (const name of ['0x11EC group', 'X25519 split', 'ML-KEM split']) {
-    await expect(page.getByRole('button', { name, exact: true })).toBeVisible();
+  await page.locator('#wireToggle').check();
+
+  /**
+   * WCAG 2.5.3 Label in Name: the accessible name must CONTAIN the visible
+   * label, not equal it. This asserted equality when it was written, which
+   * matched this branch's markup — then main's 4d12e09 gave each control a
+   * descriptive `aria-label` ("Reset: restart the handshake simulation"), which
+   * is both more useful to a screen-reader user and still conformant. Equality
+   * would have forced those labels back out to keep a test green.
+   *
+   * Derived from the page rather than from a list, so a control added later is
+   * covered without anyone remembering to add it here.
+   */
+  const controls = await page.locator('button, input[type="checkbox"]').evaluateAll((nodes) =>
+    nodes
+      .filter((node) => (node as HTMLElement).offsetParent !== null)
+      .map((node) => {
+        // A checkbox's visible label is the text of the <label> wrapping it.
+        const visibleSource = node.tagName === 'INPUT' ? node.closest('label') : node;
+        return {
+          visible: (visibleSource?.textContent ?? '').replace(/\s+/g, ' ').trim(),
+          accessible: (node.getAttribute('aria-label') ?? visibleSource?.textContent ?? '').replace(/\s+/g, ' ').trim(),
+        };
+      })
+      .filter((control) => control.visible.length > 0),
+  );
+
+  // A scan that found nothing would pass the rule below over nothing.
+  expect(controls.length).toBeGreaterThanOrEqual(6);
+  // Case-insensitive: WCAG 2.5.3 exists so a voice-control user can say the
+  // visible label, and voice input normalises case. "Advance to the next
+  // handshake step" does contain "Step" for that purpose.
+  const offenders = controls.filter(
+    (control) => !control.accessible.toLowerCase().includes(control.visible.toLowerCase()),
+  );
+  expect(offenders, `accessible names that drop their visible label: ${JSON.stringify(offenders)}`).toEqual([]);
+
+  // The controls this test was written for are among them.
+  const visibleLabels = controls.map((control) => control.visible);
+  for (const label of ['Step', 'Reset', '0x11EC group', 'X25519 split', 'ML-KEM split']) {
+    expect(visibleLabels, label).toContain(label);
   }
 });
 
