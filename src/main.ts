@@ -369,7 +369,7 @@ function buildMtuVisual(result: HandshakeResult): string {
       </div>
       <div class="mtu-boundary" aria-hidden="true"><span>~1500 B typical MTU</span></div>
     </div>
-    <p class="metric-note">The classical hello is a sliver; the hybrid hello fills most of one <span class="nowrap">~1500-byte</span> packet. That is why the deployment risk is <strong>fragmentation</strong>, not compute — a hello that spans packet boundaries can trip middleboxes that mishandle fragmented handshakes.</p>
+    <p class="metric-note">The classical hello is a sliver; the hybrid hello fills most of one <span class="nowrap">~1500-byte</span> packet. Extra bytes can cross packet boundaries and expose <strong>fragmentation</strong> or middlebox problems. Their impact relative to computation depends on MTU, RTT, loss, endpoint hardware and the complete handshake.</p>
   `;
 }
 
@@ -455,10 +455,10 @@ function render(): void {
         <h3>Exhibit 2: Why Hybrid?</h3>
         <p>Final shared secret = ML-KEM_secret || X25519_secret — the ML-KEM share comes first for
         <code>X25519MLKEM768</code>, and an implementation that concatenates in name order will not
-        interoperate. The connection survives if either primitive remains secure.</p>
+        interoperate. Shared-secret confidentiality can survive a break of one component when the other remains secure and the combiner and implementation assumptions hold. This key-exchange demo does not authenticate the peer: whole-connection security also requires certificate validation, authenticated transcript binding and correct TLS integration.</p>
         <table>
-          <caption>Hybrid security outcomes by threat scenario</caption>
-          <thead><tr><th scope="col">Threat</th><th scope="col">Connection</th></tr></thead>
+          <caption>Conditional shared-secret confidentiality, assuming correct combination and authenticated integration</caption>
+          <thead><tr><th scope="col">Threat</th><th scope="col">Shared secret</th></tr></thead>
           <tbody>
             <tr><td>Classical adversary, today</td><td class="ok">Secure</td></tr>
             <tr><td>Harvest-now-decrypt-later quantum threat</td><td class="ok">Secure</td></tr>
@@ -482,7 +482,7 @@ function render(): void {
           <div class="metric"><span>Total hello bytes</span><strong>${bytesOverhead}</strong><em>${r.totalBytes} vs ${state.classical.totalBytes} classical</em></div>
           <div class="metric"><span>Key-exchange compute</span><strong>${computeOverhead}</strong><em>${hybridMs.toFixed(3)}ms vs ${classicalMs.toFixed(3)}ms, measured</em></div>
         </div>
-        <p class="metric-note">Compute is timed live in your browser (min of ${state.compute.samples} samples). The dominant real-world post-quantum cost is the extra ${r.totalBytes - state.classical.totalBytes} bytes on the wire, not these sub-millisecond computations.</p>
+        <p class="metric-note">Compute is timed live in your browser (min of ${state.compute.samples} samples). The extra ${r.totalBytes - state.classical.totalBytes} modeled bytes are a separate wire cost. These local minimum timings do not measure end-to-end TLS latency or establish which cost dominates. Compare authentication mode, implementation/version, workload, endpoint hardware, RTT, loss, MTU and median/tail latency. <a href="https://eprint.iacr.org/2021/1019">KEMTLS measurement scope</a>.</p>
         ${buildMtuVisual(r)}
       </section>
 
