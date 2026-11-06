@@ -110,3 +110,7 @@ a live compute measurement, and a source scan that rejects `Math.random`. The sa
 *Part of the [Crypto Lab](https://crypto-lab.systemslibrarian.dev/) suite.*
 
 *"So whether you eat or drink or whatever you do, do it all for the glory of God." — 1 Corinthians 10:31*
+
+## Research scope review — November 2026
+
+CL3106 (reinforced by CL3126/CL3095): Shared-secret confidentiality is distinct from peer authentication and whole-connection security. Local minimum browser timings and modeled bytes do not rank end-to-end costs. Source: https://eprint.iacr.org/2021/1019 (pp. 5–8, 10–15). No KEMTLS protocol was added.
