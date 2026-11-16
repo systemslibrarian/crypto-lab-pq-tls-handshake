@@ -113,4 +113,4 @@ a live compute measurement, and a source scan that rejects `Math.random`. The sa
 
 ## Research scope review — November 2026
 
-CL3106 (reinforced by CL3126/CL3095): Shared-secret confidentiality is distinct from peer authentication and whole-connection security. Local minimum browser timings and modeled bytes do not rank end-to-end costs. Source: https://eprint.iacr.org/2021/1019 (pp. 5–8, 10–15). No KEMTLS protocol was added.
+Sofía Celi et al., *Implementing and Measuring KEMTLS* (2021), https://eprint.iacr.org/2021/1019 — reinforced by Christian Paquin, Douglas Stebila and Goutam Tamvada, *Benchmarking Post-Quantum Cryptography in TLS* (2019), https://eprint.iacr.org/2019/1447, and Felix Günther, Simon Rastikian, Patrick Towa and Thom Wiggers, *KEMTLS with Delayed Forward Identity Protection in (Almost) a Single Round Trip* (2021), https://eprint.iacr.org/2021/725: shared-secret confidentiality is distinct from peer authentication and whole-connection security. Local minimum browser timings and modeled bytes do not rank end-to-end costs. Source: https://eprint.iacr.org/2021/1019 (pp. 5–8, 10–15). No KEMTLS protocol was added.
