@@ -27,7 +27,7 @@ A **"Why does this exist?"** intro and a hoverable glossary front the page: a fu
 1. **Hybrid Key Exchange, Live** — step through the three stages (generate ephemeral keypairs → send the ClientHello, which jumps the wire inspector to the `0x11EC` named group → both sides independently derive the *same* 64-byte secret, shown side by side with a match check).
 2. **Why Hybrid?** — the threat-scenario survival table: each adversary/failure mode against a plain Secure/Broken outcome, so "safe if either primitive holds" reads straight off the rows.
 3. **Building the Hybrid Secret** — animates the 32-byte ML-KEM secret (purple) and 32-byte X25519 secret (blue) concatenating, in the RFC 10024 order, into the 64-byte hybrid value, which flows as one input into `HKDF-Extract` and out to the handshake and traffic secrets. Every hex preview is the real value derived this run — showing that the standard TLS 1.3 key schedule needs no redesign even though hybrid negotiation and wire encoding use a new named group.
-4. **Size and Compute Impact** — measured key-share sizes and live compute timing, with an MTU visual drawing the 1216-byte hybrid ClientHello against a ~1500-byte packet boundary next to the tiny classical one.
+4. **Size and Compute Impact** — measured key-share sizes and live compute timing, with an MTU visual drawing the full serialized hybrid `ClientHello` (about 1.3 KB, of which the hybrid key share is 1216 bytes) against a ~1500-byte packet boundary next to the tiny classical one.
 5. **Wire Format Inspector** — a hex dump of the real serialized `ClientHello`, every offset and length computed from the actual bytes, with colour-coded named-group / X25519 / ML-KEM highlights.
 6. **Deployment Reality** — current browser and CDN adoption, and the IETF codepoint story.
 
@@ -35,7 +35,7 @@ Everything shown is real, not mocked:
 
 - The **wire-format inspector** dumps the actual serialized `ClientHello`; every byte offset and length (including the `0x11EC` group position) is computed from the real message, not hardcoded.
 - The **classical X25519 comparison** is serialized through the exact same encoder, so the size difference is genuinely measured rather than asserted.
-- The **compute cost** is timed live in your browser with `performance.now()` over real keygen / encapsulation / decapsulation — reported as the minimum across samples. (The dominant real-world post-quantum cost is the extra bytes on the wire — ~1.1 KB added to the `ClientHello` alone, ~2.3 KB across both hellos — not these sub-millisecond computations, and the UI says so.)
+- The **compute cost** is timed live in your browser with `performance.now()` over real keygen / encapsulation / decapsulation — reported as the minimum across samples. (The hybrid key shares add ~1.2 KB to the `ClientHello` and ~2.3 KB across both hellos. Neither this browser timer nor those byte counts tells us which cost dominates a real connection — that depends on MTU, RTT, loss, endpoint hardware and the complete handshake, and the UI says so.)
 - All randomness comes from `crypto.getRandomValues` — a CI gate fails the build if `Math.random` ever appears in `src/`.
 
 ## When to Use It
