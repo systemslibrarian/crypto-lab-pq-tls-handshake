@@ -133,3 +133,12 @@ test('the displayed hybrid secret really begins with the ML-KEM component', asyn
   expect(t, 'no comparable suffix in the previews').toBeGreaterThan(0);
   expect(tail(hybrid).slice(-t)).toBe(tail(x25519).slice(-t));
 });
+
+test('a clock that cannot resolve the benchmark gives no percentage comparison', async ({ page }) => {
+  await page.addInitScript(() => Object.defineProperty(performance, 'now', { value: () => 1000 }));
+  await page.goto('.');
+  const compute = page.locator('.metric').filter({ hasText: 'Key-exchange compute' });
+  await expect(compute.locator('strong')).toHaveText('Below timer resolution');
+  await expect(compute.locator('em')).toHaveText('below timer resolution hybrid vs below timer resolution classical');
+  await expect(page.locator('.metric').filter({ hasText: 'Total hello bytes' }).locator('strong')).toHaveText(/^[+]\d+%$/);
+});

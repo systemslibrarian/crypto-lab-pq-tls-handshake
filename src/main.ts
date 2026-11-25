@@ -380,13 +380,13 @@ function render(): void {
   // measure as a near-zero or slightly negative delta on a noisy sample, so the
   // sign must come from the value, not a hardcoded '+'.
   const signedPct = (numerator: number, denominator: number): string => {
-    if (denominator <= 0) {
-      return '0%';
-    }
     const pct = (numerator / denominator) * 100;
     return `${pct >= 0 ? '+' : '−'}${Math.abs(pct).toFixed(0)}%`;
   };
-  const computeOverhead = signedPct(hybridMs - classicalMs, classicalMs);
+  const computeOverhead = classicalMs > 0 && hybridMs > 0
+    ? signedPct(hybridMs - classicalMs, classicalMs)
+    : 'Below timer resolution';
+  const timing = (ms: number): string => ms > 0 ? `${ms.toFixed(3)}ms` : 'below timer resolution';
   const bytesOverhead = signedPct(r.totalBytes - state.classical.totalBytes, state.classical.totalBytes);
 
   appRoot.innerHTML = `
@@ -480,7 +480,7 @@ function render(): void {
           <div class="metric"><span>Client key share</span><strong>${CLIENT_KEYSHARE_BYTES} bytes</strong><em>${bytesMultiplier(CLIENT_KEYSHARE_BYTES)}</em></div>
           <div class="metric"><span>Server key share</span><strong>${SERVER_KEYSHARE_BYTES} bytes</strong><em>${bytesMultiplier(SERVER_KEYSHARE_BYTES)}</em></div>
           <div class="metric"><span>Total hello bytes</span><strong>${bytesOverhead}</strong><em>${r.totalBytes} vs ${state.classical.totalBytes} classical</em></div>
-          <div class="metric"><span>Key-exchange compute</span><strong>${computeOverhead}</strong><em>${hybridMs.toFixed(3)}ms vs ${classicalMs.toFixed(3)}ms, measured</em></div>
+          <div class="metric"><span>Key-exchange compute</span><strong>${computeOverhead}</strong><em>${timing(hybridMs)} hybrid vs ${timing(classicalMs)} classical</em></div>
         </div>
         <p class="metric-note">Compute is timed live in your browser (min of ${state.compute.samples} samples). The extra ${r.totalBytes - state.classical.totalBytes} modeled bytes are a separate wire cost. These local minimum timings do not measure end-to-end TLS latency or establish which cost dominates. Compare authentication mode, implementation/version, workload, endpoint hardware, RTT, loss, MTU and median/tail latency. <a href="https://eprint.iacr.org/2021/1019">KEMTLS measurement scope</a>.</p>
         ${buildMtuVisual(r)}
